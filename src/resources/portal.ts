@@ -103,8 +103,13 @@ export class Portal {
    * `marketing_consent` records a `marketing_email` consent decision with
    * source `portal`. Returns the profile as it is after the change.
    */
+  /**
+   * A profile patch is not idempotency-keyed on the server and a `marketing_consent`
+   * change records a dated consent event, so a retry after a committed-but-lost
+   * response would repeat that event: sent exactly once, like the other writes.
+   */
   async updateMe(session: string, patch: PortalProfilePatch): Promise<ApiResponse<PortalProfile>> {
-    return this.client.patch("/api/v1/portal/me", patch, withSession(session));
+    return this.client.patch("/api/v1/portal/me", patch, { ...withSession(session), ...ONCE });
   }
 
   /**
