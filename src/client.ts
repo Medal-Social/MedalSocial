@@ -166,19 +166,27 @@ export class BaseClient {
 
   /** Execute an authenticated PATCH request with a JSON body. */
   async patch<T>(path: string, body: unknown, options?: RequestOptions): Promise<T> {
-    return this.request<T>(this.buildUrl(path), {
-      method: "PATCH",
-      headers: this.writeHeaders(options),
-      body: JSON.stringify(body),
-    });
+    return this.request<T>(
+      this.buildUrl(path),
+      {
+        method: "PATCH",
+        headers: this.writeHeaders(options),
+        body: JSON.stringify(body),
+      },
+      options?.retry,
+    );
   }
 
   /** Execute an authenticated DELETE request. */
   async delete<T>(path: string, options?: RequestOptions): Promise<T> {
-    return this.request<T>(this.buildUrl(path), {
-      method: "DELETE",
-      headers: this.writeHeaders(options),
-    });
+    return this.request<T>(
+      this.buildUrl(path),
+      {
+        method: "DELETE",
+        headers: this.writeHeaders(options),
+      },
+      options?.retry,
+    );
   }
 
   private writeHeaders(options?: RequestOptions): Record<string, string> {

@@ -1583,6 +1583,29 @@ describe("request headers", () => {
     expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 
+  it.each([
+    ["patch", (c: BaseClient) => c.patch("/api/v1/bookings/b1", {}, { retry: false })],
+    ["delete", (c: BaseClient) => c.delete("/api/v1/webhooks/wh1", { retry: false })],
+  ])("retry: false sends a 503 exactly once on %s too", async (_verb, call) => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(mockJson({ error: { code: "UPSTREAM", message: "down" } }, 503));
+    await expect(call(client())).rejects.toMatchObject({ status: 503, code: "UPSTREAM" });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ["patch", (c: BaseClient) => c.patch("/api/v1/bookings/b1", {})],
+    ["delete", (c: BaseClient) => c.delete("/api/v1/webhooks/wh1")],
+  ])("%s still retries a 503 by default", async (_verb, call) => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(mockJson({ error: { code: "UPSTREAM", message: "down" } }, 503))
+      .mockResolvedValueOnce(mockJson({ data: { ok: true } }));
+    await call(client());
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
   it("does not let the bag override the JSON content-type", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (_url, init) => {
       expect(new Headers(init?.headers).get("content-type")).toBe("application/json");
