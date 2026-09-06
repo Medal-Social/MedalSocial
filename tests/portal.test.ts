@@ -274,6 +274,7 @@ describe("portal", () => {
 
   it.each([
     ["verify", (m: Medal) => m.portal.login.verify({ email: "ida@example.com", code: "123456" })],
+    ["updateMe", (m: Medal) => m.portal.updateMe("sess_1", { marketing_consent: false })],
     ["logout", (m: Medal) => m.portal.logout("sess_1")],
     ["deleteMe", (m: Medal) => m.portal.deleteMe("sess_1")],
   ])("%s goes to the wire exactly once even on a 503", async (_name, call) => {
