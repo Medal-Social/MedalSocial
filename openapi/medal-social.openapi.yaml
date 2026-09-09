@@ -4989,10 +4989,10 @@ components:
         promoted_to_contact_id:
           type: [string, "null"]
         created_at:
-          type: [string, "null"]
+          type: string
           format: date-time
         updated_at:
-          type: [string, "null"]
+          type: string
           format: date-time
     CreateContactPersonInput:
       type: object
@@ -5040,9 +5040,10 @@ components:
         note:
           type: [string, "null"]
         counterpart_name:
-          type: [string, "null"]
+          type: string
+          description: Empty string when the counterpart contact no longer exists.
         created_at:
-          type: [string, "null"]
+          type: string
           format: date-time
     ContactRelations:
       description: Relations a contact holds, split by direction.
@@ -5145,15 +5146,15 @@ components:
         status:
           $ref: "#/components/schemas/BookingEventStatus"
         registration_closes_at:
-          type: [string, "null"]
+          type: string
           format: date-time
         slug:
           type: string
         created_at:
-          type: [string, "null"]
+          type: string
           format: date-time
         updated_at:
-          type: [string, "null"]
+          type: string
           format: date-time
     CreateBookingEventInput:
       type: object

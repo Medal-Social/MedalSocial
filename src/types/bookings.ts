@@ -353,9 +353,9 @@ export interface ContactPerson {
   active: boolean;
   promoted_to_contact_id: string | null;
   /** ISO 8601. */
-  created_at: string | null;
+  created_at: string;
   /** ISO 8601. */
-  updated_at: string | null;
+  updated_at: string;
 }
 
 /** Input for `bookings.persons.create(...)`. */
@@ -377,9 +377,10 @@ export interface ContactRelation {
   custom_label: string | null;
   since: number | null;
   note: string | null;
-  counterpart_name: string | null;
+  /** Empty string when the counterpart contact no longer exists. */
+  counterpart_name: string;
   /** ISO 8601. */
-  created_at: string | null;
+  created_at: string;
 }
 
 /** Relations a contact holds, split by direction. */
@@ -432,12 +433,12 @@ export interface BookingEvent {
   price_override_ore: number | null;
   status: BookingEventStatus;
   /** ISO 8601. */
-  registration_closes_at: string | null;
+  registration_closes_at: string;
   slug: string;
   /** ISO 8601. */
-  created_at: string | null;
+  created_at: string;
   /** ISO 8601. */
-  updated_at: string | null;
+  updated_at: string;
 }
 
 /** Options for `bookings.events.list(...)`. The window is `yyyy-mm-dd`, inclusive. */
