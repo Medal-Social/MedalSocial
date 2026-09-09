@@ -42,14 +42,29 @@ jobs:
 
       - run: pnpm quality
 
+      # v2 reads the packages Changesets published from the structured
+      # CHANGESETS_OUTPUT file instead of scraping "New tag:" out of stdout.
+      # Changesets v3 no longer prints that line, so v1.7.0 silently found no
+      # released packages and skipped every tag push and GitHub release from
+      # 1.7.0 onwards. v2 also pushes tags and creates releases *before* it
+      # honours the publish script's exit code, so a failure in a later publish
+      # target can no longer swallow them.
       - name: Create release PR or publish packages
         id: changesets
-        uses: changesets/action@6a0a831ff30acef54f2c6aa1cbbc1096b066edaf # v1.7.0
+        uses: changesets/action@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
         with:
-          commit: 'chore: release packages'
-          title: 'chore: release packages'
-          version: pnpm run version
-          publish: pnpm run release
+          github-token: ${{ steps.app-token.outputs.token }}
+          commit-message: 'chore: release packages'
+          pr-title: 'chore: release packages'
+          version-script: pnpm run version
+          publish-script: pnpm run release
         env:
-          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           NPM_CONFIG_PROVENANCE: 'true'
+
+      # JSR is a second registry, published after npm and after the tag and
+      # GitHub release exist. It runs on its own so a JSR-side failure cannot
+      # take the npm release with it, and the script is idempotent so re-running
+      # this job is safe.
+      - name: Publish to JSR
+        if: steps.changesets.outputs.published == 'true'
+        run: pnpm jsr:publish
