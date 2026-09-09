@@ -894,6 +894,26 @@ paths:
   /api/v1/bookings/events/{id}/registrations:
     parameters:
       - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Bookings]
+      operationId: listBookingEventRegistrations
+      summary: An arrangement's roster
+      description: >-
+        Every booking registered to the arrangement, ordered by
+        `event_order`. Names come from the live contact and person, not the
+        booking's snapshot. Cancelled registrations are returned, not
+        filtered — the event's `registered_count` answers the capacity
+        question separately. Capped at 300 rows; `truncated: true` means the
+        ordering can no longer be trusted.
+      responses:
+        "200":
+          description: The arrangement's roster.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse_ListBookingEventRegistrationsResult"
+        default:
+          $ref: "#/components/responses/ApiError"
     post:
       tags: [Bookings]
       operationId: registerBookingEvent
@@ -5550,7 +5570,7 @@ components:
       properties:
         name:
           type: string
-          maxLength: 200
+          maxLength: 120
         birth_year:
           type: integer
           minimum: 1900
@@ -5568,7 +5588,7 @@ components:
           type: string
         note:
           type: string
-          maxLength: 2000
+          maxLength: 5000
         consent_accepted:
           description: >-
             Must be literally `true`. The guardian has to actively consent
@@ -5576,6 +5596,17 @@ components:
             `false` is a 400.
           const: true
           type: boolean
+        consent_version:
+          description: >-
+            Your own version label for the consent wording shown; defaults
+            server-side to `event-consent-v1`.
+          type: string
+          minLength: 1
+          maxLength: 64
+        consent_text:
+          description: The exact wording shown, stored on the consent record.
+          type: string
+          maxLength: 2000
         return_url:
           description: >-
             Where the wallet returns the guardian, when the registration
@@ -5584,9 +5615,6 @@ components:
           type: string
           minLength: 1
           maxLength: 2048
-        notify:
-          description: Whether to notify the guardian once the registration is recorded.
-          type: boolean
     BookingEventRegistrationPaymentError:
       description: >-
         A payment could not be started for a registration that otherwise
@@ -5601,7 +5629,7 @@ components:
     BookingEventRegistrationResult:
       description: Result of `registerBookingEvent`. `payment` is `null` when the service needs no payment.
       type: object
-      required: [booking, payment]
+      required: [booking, contact_id, person_id, payment]
       properties:
         booking:
           $ref: "#/components/schemas/Booking"
@@ -5610,12 +5638,83 @@ components:
             Show-once secret for the guardian's manage link. Only its hash is
             stored, and an idempotent replay omits this field entirely.
           type: string
+        contact_id:
+          description: The guardian's contact, created or reused.
+          type: string
+        person_id:
+          description: The child's ContactPerson, created or reused.
+          type: string
         payment:
           oneOf:
             - $ref: "#/components/schemas/BookingPaymentStart"
             - type: "null"
         payment_error:
           $ref: "#/components/schemas/BookingEventRegistrationPaymentError"
+    BookingEventRegistration:
+      description: >-
+        One row of an arrangement's roster (SP10a). A projection — names come
+        from the live contact and person, not the booking's snapshot.
+      type: object
+      required:
+        [
+          booking_id,
+          event_order,
+          contact_id,
+          contact_name,
+          person_id,
+          participant_name,
+          participant_birth_year,
+          service_id,
+          resource_id,
+          start_ts,
+          status,
+          amount_ore,
+          payment_status,
+        ]
+      properties:
+        booking_id:
+          type: [string, "null"]
+        event_order:
+          type: [integer, "null"]
+        contact_id:
+          type: [string, "null"]
+        contact_name:
+          type: [string, "null"]
+        person_id:
+          type: [string, "null"]
+        participant_name:
+          type: [string, "null"]
+        participant_birth_year:
+          type: [integer, "null"]
+        service_id:
+          type: [string, "null"]
+        resource_id:
+          type: [string, "null"]
+        start_ts:
+          type: [string, "null"]
+          format: date-time
+        status:
+          oneOf:
+            - $ref: "#/components/schemas/BookingStatus"
+            - type: "null"
+        amount_ore:
+          type: [integer, "null"]
+        payment_status:
+          $ref: "#/components/schemas/BookingPaymentStatus"
+    ListBookingEventRegistrationsResult:
+      description: >-
+        Result of `listBookingEventRegistrations` — an arrangement's roster,
+        ordered by `event_order`. Capped at 300 rows; `truncated: true` means
+        the ordering can no longer be trusted.
+      type: object
+      required: [registrations, truncated]
+      properties:
+        registrations:
+          type: array
+          items:
+            $ref: "#/components/schemas/BookingEventRegistration"
+        truncated:
+          type: boolean
     ApiResponse_ContactPersonArray:
       $ref: "#/components/schemas/Envelope_ContactPersonArray"
     ApiResponse_ContactPerson:
@@ -5630,6 +5729,8 @@ components:
       $ref: "#/components/schemas/Envelope_BookingEvent"
     ApiResponse_BookingEventRegistrationResult:
       $ref: "#/components/schemas/Envelope_BookingEventRegistrationResult"
+    ApiResponse_ListBookingEventRegistrationsResult:
+      $ref: "#/components/schemas/Envelope_ListBookingEventRegistrationsResult"
     Envelope_ContactPersonArray:
       type: object
       required: [data]
@@ -5676,3 +5777,9 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/BookingEventRegistrationResult"
+    Envelope_ListBookingEventRegistrationsResult:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/ListBookingEventRegistrationsResult"

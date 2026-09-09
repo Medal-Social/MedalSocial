@@ -608,10 +608,12 @@ export interface RegisterBookingEventInput {
    * the guardian has to actively consent before the registration is recorded.
    */
   consent_accepted: true;
+  /** Your own version label for the consent wording shown; defaults server-side to `event-consent-v1`. */
+  consent_version?: string;
+  /** The exact wording shown, stored on the consent record. */
+  consent_text?: string;
   /** Where the wallet returns the guardian, when the registration starts a payment. Must be a URL one of your own sites vouches for. */
   return_url?: string;
-  /** Whether to notify the guardian (e.g. by email/SMS) once the registration is recorded. */
-  notify?: boolean;
 }
 
 /**
@@ -629,11 +631,57 @@ export interface BookingEventRegistrationPaymentError {
  *
  * `payment` is `null` when the registration's service needs no payment.
  * `manage_token` is SHOW-ONCE, exactly like {@link CreatedBooking.manage_token}
- * — persist it here or it is gone.
+ * — persist it here or it is gone. It is present on every fresh registration;
+ * an idempotent replay omits it (only its hash is stored, so a replay cannot
+ * reproduce the plaintext).
  */
 export interface BookingEventRegistrationResult {
   booking: Booking;
   manage_token?: string;
+  /** The guardian's contact, created or reused. */
+  contact_id: string;
+  /** The child's {@link ContactPerson}, created or reused. */
+  person_id: string;
   payment: BookingPaymentStart | null;
   payment_error?: BookingEventRegistrationPaymentError;
+}
+
+/**
+ * One row of an arrangement's roster (SP10a).
+ *
+ * A PROJECTION, not a snapshot: `contact_name` / `participant_name` /
+ * `participant_birth_year` come from the live contact and person, so a child
+ * renamed since registering reads as they are now.
+ */
+export interface BookingEventRegistration {
+  booking_id: string | null;
+  /** Position of this booking within the arrangement's registrations. */
+  event_order: number | null;
+  contact_id: string | null;
+  contact_name: string | null;
+  /** The {@link ContactPerson} this registration was made for, if any. */
+  person_id: string | null;
+  participant_name: string | null;
+  participant_birth_year: number | null;
+  service_id: string | null;
+  resource_id: string | null;
+  start_ts: string | null;
+  status: BookingStatus | null;
+  amount_ore: number | null;
+  payment_status: BookingPaymentStatus;
+}
+
+/**
+ * Result of `bookings.events.registrations(id)` — an arrangement's roster,
+ * ordered by `event_order`. Cancelled registrations are returned, not
+ * filtered — the event's `registered_count` answers the capacity question
+ * separately.
+ */
+export interface ListBookingEventRegistrationsResult {
+  registrations: BookingEventRegistration[];
+  /**
+   * The roster is capped at 300 rows; `true` means the page was cut and the
+   * `event_order` ordering can no longer be trusted.
+   */
+  truncated: boolean;
 }

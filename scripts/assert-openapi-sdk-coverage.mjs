@@ -292,6 +292,14 @@ const expected = [
     "/api/v1/bookings/events/${encodeURIComponent(id)}",
   ],
   [
+    "get",
+    "/api/v1/bookings/events/{id}/registrations",
+    "listBookingEventRegistrations",
+    "src/resources/bookings.ts",
+    "get",
+    "/api/v1/bookings/events/${encodeURIComponent(id)}/registrations",
+  ],
+  [
     "post",
     "/api/v1/bookings/events/{id}/registrations",
     "registerBookingEvent",

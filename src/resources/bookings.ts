@@ -23,6 +23,7 @@ import type {
   CreateContactPersonInput,
   CreateContactRelationInput,
   CreateContactRelationResult,
+  ListBookingEventRegistrationsResult,
   ListBookingEventsOptions,
   ListBookingServicesOptions,
   ListBookingsOptions,
@@ -262,6 +263,9 @@ class BookingsEvents {
    * and retry with `bookings.payment.start(booking.id, ...)` on the returned
    * booking rather than registering again.
    *
+   * `contact_id` / `person_id` are the guardian's contact and the child's
+   * {@link ContactPerson}, created or reused.
+   *
    * Automatically idempotent: the SDK mints an `Idempotency-Key` so its own
    * 5xx retries replay instead of registering twice.
    */
@@ -275,6 +279,20 @@ class BookingsEvents {
       input,
       options,
     );
+  }
+
+  /**
+   * An arrangement's roster, ordered by `event_order`. Names come from the
+   * live contact and person, not the booking's snapshot, so a renamed child
+   * reads as they are now.
+   *
+   * Cancelled registrations are returned, not filtered — the event's
+   * `registered_count` answers the capacity question separately. Capped at
+   * 300 rows; `truncated: true` means the `event_order` ordering can no
+   * longer be trusted.
+   */
+  async registrations(id: string): Promise<ApiResponse<ListBookingEventRegistrationsResult>> {
+    return this.client.get(`/api/v1/bookings/events/${encodeURIComponent(id)}/registrations`);
   }
 }
 
