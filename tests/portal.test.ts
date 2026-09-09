@@ -96,6 +96,7 @@ describe("portal", () => {
             family: profile.family,
             consents: [],
             bookings: [],
+            relations: [],
           },
         });
       }
@@ -131,6 +132,33 @@ describe("portal", () => {
     const { data } = await medal.portal.me(SESSION);
     expect(data.email).toBe("ida@example.com");
     expect(data.family[0].birth_year).toBe(2018);
+  });
+
+  it("reads persons and labels alongside family", async () => {
+    const profileWithPersons = {
+      ...profile,
+      persons: [
+        {
+          person_id: "per_1",
+          name: "Ola",
+          birth_year: 2018,
+          relation_type: "guardian",
+          relation_label: null,
+          notes: null,
+          active: true,
+        },
+      ],
+      labels: { person: "Barn", persons: "Barn" },
+    };
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
+      expect(new URL(url as string).pathname).toBe("/api/v1/portal/me");
+      expect(init?.method).toBe("GET");
+      return mockJson({ data: profileWithPersons });
+    });
+    const medal = new Medal("medal_test", { baseUrl: BASE });
+    const { data } = await medal.portal.me(SESSION);
+    expect(data.persons).toEqual(profileWithPersons.persons);
+    expect(data.labels).toEqual({ person: "Barn", persons: "Barn" });
   });
 
   it("patches the profile with the supplied fields only", async () => {
@@ -226,6 +254,16 @@ describe("portal", () => {
             },
           ],
           bookings: [],
+          relations: [
+            {
+              direction: "outgoing",
+              type: "guardian",
+              custom_label: null,
+              since: null,
+              note: null,
+              counterpart_name: "Ola",
+            },
+          ],
         },
       });
     });
@@ -233,6 +271,7 @@ describe("portal", () => {
     const { data } = await medal.portal.exportMyData(SESSION);
     expect(data.contact.contact_id).toBe("c_1");
     expect(data.consents[0].source).toBe("portal");
+    expect(data.relations[0].counterpart_name).toBe("Ola");
   });
 
   it("resolves logout to undefined on a 204", async () => {

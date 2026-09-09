@@ -1,4 +1,4 @@
-import type { BookingStatus } from "./bookings";
+import type { BookingStatus, RelationType } from "./bookings";
 
 /** Input for starting an e-mail one-time-code login. */
 export interface PortalLoginStartInput {
@@ -48,6 +48,24 @@ export interface PortalFamilyMember {
   birth_year: number;
 }
 
+/** A person the contact books for — a child, a pet — with no login of its own. */
+export interface PortalPerson {
+  person_id: string;
+  name: string;
+  birth_year: number | null;
+  relation_type: RelationType;
+  relation_label: string | null;
+  notes: string | null;
+  /** `false` for a person the customer removed or that was promoted to its own contact; `me` returns active persons only, the export returns all. */
+  active: boolean;
+}
+
+/** The workspace's own words for the person concept, e.g. `"Barn"`. */
+export interface PortalLabels {
+  person: string;
+  persons: string;
+}
+
 /** The signed-in contact's own profile. */
 export interface PortalProfile {
   contact_id: string;
@@ -56,6 +74,8 @@ export interface PortalProfile {
   last_name: string | null;
   phone: string | null;
   family: PortalFamilyMember[];
+  persons: PortalPerson[];
+  labels: PortalLabels;
   marketing_consent: boolean;
   /** Unix timestamp in milliseconds. */
   created_at: number;
@@ -114,6 +134,16 @@ export interface PortalConsentRecord {
   source: string;
 }
 
+/** A relation the exporting contact is a party to; only the counterpart's display name is exposed. */
+export interface PortalExportRelation {
+  direction: "outgoing" | "incoming";
+  type: RelationType;
+  custom_label: string | null;
+  since: number | null;
+  note: string | null;
+  counterpart_name: string;
+}
+
 /** Everything the workspace holds about the signed-in contact (GDPR Art. 15). */
 export interface PortalExport {
   /** Unix timestamp in milliseconds. */
@@ -122,4 +152,5 @@ export interface PortalExport {
   family: PortalFamilyMember[];
   consents: PortalConsentRecord[];
   bookings: PortalBooking[];
+  relations: PortalExportRelation[];
 }
