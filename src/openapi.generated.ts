@@ -503,7 +503,11 @@ export interface paths {
       };
       cookie?: never;
     };
-    get?: never;
+    /**
+     * An arrangement's roster
+     * @description Every booking registered to the arrangement, ordered by `event_order`. Names come from the live contact and person, not the booking's snapshot. Cancelled registrations are returned, not filtered — the event's `registered_count` answers the capacity question separately. Capped at 300 rows; `truncated: true` means the ordering can no longer be trusted.
+     */
+    get: operations["listBookingEventRegistrations"];
     put?: never;
     /**
      * Register a child for an arrangement
@@ -2978,10 +2982,12 @@ export interface components {
        * @constant
        */
       consent_accepted: true;
+      /** @description Your own version label for the consent wording shown; defaults server-side to `event-consent-v1`. */
+      consent_version?: string;
+      /** @description The exact wording shown, stored on the consent record. */
+      consent_text?: string;
       /** @description Where the wallet returns the guardian, when the registration starts a payment. Must be a URL one of this workspace's own sites vouches for; anything else answers 422. */
       return_url?: string;
-      /** @description Whether to notify the guardian once the registration is recorded. */
-      notify?: boolean;
     };
     /** @description A payment could not be started for a registration that otherwise succeeded. The booking is still created. */
     BookingEventRegistrationPaymentError: {
@@ -2993,8 +2999,34 @@ export interface components {
       booking: components["schemas"]["Booking"];
       /** @description Show-once secret for the guardian's manage link. Only its hash is stored, and an idempotent replay omits this field entirely. */
       manage_token?: string;
+      /** @description The guardian's contact, created or reused. */
+      contact_id: string;
+      /** @description The child's ContactPerson, created or reused. */
+      person_id: string;
       payment: components["schemas"]["BookingPaymentStart"] | null;
       payment_error?: components["schemas"]["BookingEventRegistrationPaymentError"];
+    };
+    /** @description One row of an arrangement's roster (SP10a). A projection — names come from the live contact and person, not the booking's snapshot. */
+    BookingEventRegistration: {
+      booking_id: string | null;
+      event_order: number | null;
+      contact_id: string | null;
+      contact_name: string | null;
+      person_id: string | null;
+      participant_name: string | null;
+      participant_birth_year: number | null;
+      service_id: string | null;
+      resource_id: string | null;
+      /** Format: date-time */
+      start_ts: string | null;
+      status: components["schemas"]["BookingStatus"] | null;
+      amount_ore: number | null;
+      payment_status: components["schemas"]["BookingPaymentStatus"];
+    };
+    /** @description Result of `listBookingEventRegistrations` — an arrangement's roster, ordered by `event_order`. Capped at 300 rows; `truncated: true` means the ordering can no longer be trusted. */
+    ListBookingEventRegistrationsResult: {
+      registrations: components["schemas"]["BookingEventRegistration"][];
+      truncated: boolean;
     };
     ApiResponse_ContactPersonArray: components["schemas"]["Envelope_ContactPersonArray"];
     ApiResponse_ContactPerson: components["schemas"]["Envelope_ContactPerson"];
@@ -3003,6 +3035,7 @@ export interface components {
     ApiResponse_BookingEventArray: components["schemas"]["Envelope_BookingEventArray"];
     ApiResponse_BookingEvent: components["schemas"]["Envelope_BookingEvent"];
     ApiResponse_BookingEventRegistrationResult: components["schemas"]["Envelope_BookingEventRegistrationResult"];
+    ApiResponse_ListBookingEventRegistrationsResult: components["schemas"]["Envelope_ListBookingEventRegistrationsResult"];
     Envelope_ContactPersonArray: {
       data: components["schemas"]["ContactPerson"][];
     };
@@ -3023,6 +3056,9 @@ export interface components {
     };
     Envelope_BookingEventRegistrationResult: {
       data: components["schemas"]["BookingEventRegistrationResult"];
+    };
+    Envelope_ListBookingEventRegistrationsResult: {
+      data: components["schemas"]["ListBookingEventRegistrationsResult"];
     };
   };
   responses: {
@@ -4025,6 +4061,29 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["ApiResponse_BookingEvent"];
+        };
+      };
+      default: components["responses"]["ApiError"];
+    };
+  };
+  listBookingEventRegistrations: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["parameters"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description The arrangement's roster. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponse_ListBookingEventRegistrationsResult"];
         };
       };
       default: components["responses"]["ApiError"];

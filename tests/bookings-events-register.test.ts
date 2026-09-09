@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
+  BookingEventRegistration,
   BookingEventRegistrationResult,
+  ListBookingEventRegistrationsResult,
   RegisterBookingEventChildInput,
   RegisterBookingEventGuardianInput,
   RegisterBookingEventInput,
@@ -50,6 +52,8 @@ const REGISTER_INPUT: RegisterBookingEventInput = {
   child: { name: "Nora", birth_year: 2020 },
   service_id: "svc_1",
   consent_accepted: true,
+  consent_version: "2026-09",
+  consent_text: "Jeg godtar vilkårene for barnehageklipp.",
   return_url: "https://coolkids.no/retur",
 };
 
@@ -69,6 +73,8 @@ describe("bookings.events.register (SP10a)", () => {
           data: {
             booking: BOOKING,
             manage_token: "mtok_1",
+            contact_id: "c1",
+            person_id: "pn_1",
             payment: {
               reference: "mb-e1-1",
               redirect_url: "https://vipps.test/redirect/mb-e1-1",
@@ -88,13 +94,25 @@ describe("bookings.events.register (SP10a)", () => {
     expect(data.booking.event_order).toBe(3);
     expect(data.booking.payment_mode).toBe("reserve");
     expect(data.manage_token).toBe("mtok_1");
+    expect(data.contact_id).toBe("c1");
+    expect(data.person_id).toBe("pn_1");
     expect(data.payment?.redirect_url).toBe("https://vipps.test/redirect/mb-e1-1");
     expect(sentKey).toBeTruthy();
   });
 
   it("returns payment: null when the service needs no payment", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
-      mockJson({ data: { booking: { ...BOOKING, payment_mode: "none" }, payment: null } }, 201),
+      mockJson(
+        {
+          data: {
+            booking: { ...BOOKING, payment_mode: "none" },
+            contact_id: "c1",
+            person_id: "pn_1",
+            payment: null,
+          },
+        },
+        201,
+      ),
     );
 
     const medal = new Medal("medal_test", { baseUrl: BASE });
@@ -110,6 +128,8 @@ describe("bookings.events.register (SP10a)", () => {
         {
           data: {
             booking: BOOKING,
+            contact_id: "c1",
+            person_id: "pn_1",
             payment: null,
             payment_error: { code: "WALLET_REFUSED", message: "Vipps declined the reservation" },
           },
@@ -132,7 +152,10 @@ describe("bookings.events.register (SP10a)", () => {
     let sentKey: string | null = null;
     vi.spyOn(globalThis, "fetch").mockImplementation(async (_input, init) => {
       sentKey = new Headers(init?.headers).get("idempotency-key");
-      return mockJson({ data: { booking: BOOKING, payment: null } }, 201);
+      return mockJson(
+        { data: { booking: BOOKING, contact_id: "c1", person_id: "pn_1", payment: null } },
+        201,
+      );
     });
 
     const medal = new Medal("medal_test", { baseUrl: BASE });
@@ -145,7 +168,10 @@ describe("bookings.events.register (SP10a)", () => {
     const urls: string[] = [];
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       urls.push(String(input));
-      return mockJson({ data: { booking: BOOKING, payment: null } }, 201);
+      return mockJson(
+        { data: { booking: BOOKING, contact_id: "c1", person_id: "pn_1", payment: null } },
+        201,
+      );
     });
 
     const medal = new Medal("medal_test", { baseUrl: BASE });
@@ -211,6 +237,8 @@ describe("bookings.events.register (SP10a)", () => {
     };
     const result: BookingEventRegistrationResult = {
       booking: BOOKING as unknown as BookingEventRegistrationResult["booking"],
+      contact_id: "c1",
+      person_id: "pn_1",
       payment: null,
     };
 
@@ -218,5 +246,93 @@ describe("bookings.events.register (SP10a)", () => {
     expect(child.birth_year).toBe(2020);
     expect(input.consent_accepted).toBe(true);
     expect(result.payment).toBeNull();
+  });
+});
+
+const REGISTRATION_ROW: BookingEventRegistration = {
+  booking_id: "bk_9",
+  event_order: 3,
+  contact_id: "c1",
+  contact_name: "Kari Hansen",
+  person_id: "pn_1",
+  participant_name: "Nora",
+  participant_birth_year: 2020,
+  service_id: "svc_1",
+  resource_id: "res_1",
+  start_ts: "2026-10-15T07:00:00.000Z",
+  status: "confirmed",
+  amount_ore: 39_000,
+  payment_status: "reserved",
+};
+
+describe("bookings.events.registrations (SP10a roster)", () => {
+  beforeEach(() => vi.restoreAllMocks());
+
+  it("lists an arrangement's roster ordered by event_order", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const url = String(input);
+      expect(url).toBe(`${BASE}/api/v1/bookings/events/e1/registrations`);
+      expect(init?.method).toBe("GET");
+      const body: { data: ListBookingEventRegistrationsResult } = {
+        data: { registrations: [REGISTRATION_ROW], truncated: false },
+      };
+      return mockJson(body);
+    });
+
+    const medal = new Medal("medal_test", { baseUrl: BASE });
+    const { data } = await medal.bookings.events.registrations("e1");
+
+    expect(data.registrations).toHaveLength(1);
+    expect(data.registrations[0]).toEqual(REGISTRATION_ROW);
+    expect(data.truncated).toBe(false);
+  });
+
+  it("returns an empty roster for an arrangement with no registrations", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
+      mockJson({ data: { registrations: [], truncated: false } }),
+    );
+
+    const medal = new Medal("medal_test", { baseUrl: BASE });
+    const { data } = await medal.bookings.events.registrations("e1");
+
+    expect(data.registrations).toEqual([]);
+    expect(data.truncated).toBe(false);
+  });
+
+  it("surfaces truncated: true when the roster is capped at 300 rows", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
+      mockJson({ data: { registrations: [REGISTRATION_ROW], truncated: true } }),
+    );
+
+    const medal = new Medal("medal_test", { baseUrl: BASE });
+    const { data } = await medal.bookings.events.registrations("e1");
+
+    expect(data.truncated).toBe(true);
+  });
+
+  it("url-encodes the event id", async () => {
+    const urls: string[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      urls.push(String(input));
+      return mockJson({ data: { registrations: [], truncated: false } });
+    });
+
+    const medal = new Medal("medal_test", { baseUrl: BASE });
+    await medal.bookings.events.registrations("e 1");
+
+    expect(urls).toEqual([`${BASE}/api/v1/bookings/events/e%201/registrations`]);
+  });
+
+  it("surfaces the 404 an unknown or cross-workspace arrangement answers", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
+      mockJson({ error: { code: "NOT_FOUND", message: "Event not found" } }, 404),
+    );
+
+    const medal = new Medal("medal_test", { baseUrl: BASE });
+    await expect(medal.bookings.events.registrations("e1")).rejects.toMatchObject({
+      status: 404,
+      code: "NOT_FOUND",
+    });
+    await expect(medal.bookings.events.registrations("e1")).rejects.toBeInstanceOf(MedalApiError);
   });
 });

@@ -301,14 +301,22 @@ const { data: registration } = await medal.bookings.events.register(events[0].ev
   child: { name: 'Nora', birth_year: 2020 },
   service_id: services[0].id,
   consent_accepted: true,           // must be literally true — 400 otherwise
+  consent_version: '2026-09',       // optional — your own label for the wording shown
   return_url: 'https://example.no/retur',   // only needed if the service requires payment
 });
 // registration.booking carries event_id / event_order; registration.manage_token is
-// SHOW-ONCE like CreatedBooking.manage_token. registration.payment is null when the
+// SHOW-ONCE like CreatedBooking.manage_token (omitted entirely on an idempotent replay).
+// registration.contact_id / registration.person_id are the guardian's contact and the
+// child's ContactPerson, created or reused. registration.payment is null when the
 // service needs no payment, otherwise the same show-once redirect payment.start returns.
 // A payment failure does not undo the registration — check registration.payment_error
 // and retry with bookings.payment.start(registration.booking.id, ...) rather than
 // registering again.
+
+// An arrangement's roster, ordered by event_order (cancelled rows included)
+const { data: roster } = await medal.bookings.events.registrations(events[0].event_id);
+roster.registrations[0]?.participant_name;   // read from the live person, not a snapshot
+roster.truncated;                            // true past 300 rows — event_order is no longer trustworthy
 ```
 
 #### Payments
