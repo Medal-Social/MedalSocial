@@ -562,6 +562,8 @@ export interface ListBookingEventsOptions {
   from: string;
   to: string;
   status?: BookingEventStatus;
+  /** Restrict to arrangementer at one host. */
+  host_id?: string;
 }
 
 /** Input for `bookings.events.create(...)`. */
@@ -576,4 +578,62 @@ export interface CreateBookingEventInput {
   minimum?: number;
   service_ids: string[];
   resource_ids: string[];
+}
+
+/** The guardian registering a child for an arrangement. Phone is the CRM dedupe key. */
+export interface RegisterBookingEventGuardianInput {
+  name: string;
+  email?: string;
+  phone?: string;
+}
+
+/** The child being registered. Birth year, not a birthdate — the age bracket is all that is stored. */
+export interface RegisterBookingEventChildInput {
+  name: string;
+  birth_year: number;
+}
+
+/**
+ * Input for `bookings.events.register(...)` — a guardian registering a child
+ * for an arrangement. Lands as a {@link Booking} with `event_id` set and
+ * `event_order` recording its position in the roster.
+ */
+export interface RegisterBookingEventInput {
+  guardian: RegisterBookingEventGuardianInput;
+  child: RegisterBookingEventChildInput;
+  service_id: string;
+  note?: string;
+  /**
+   * REQUIRED, and must be `true`. Mirrors {@link StartBookingPaymentInput.terms_accepted}:
+   * the guardian has to actively consent before the registration is recorded.
+   */
+  consent_accepted: true;
+  /** Where the wallet returns the guardian, when the registration starts a payment. Must be a URL one of your own sites vouches for. */
+  return_url?: string;
+  /** Whether to notify the guardian (e.g. by email/SMS) once the registration is recorded. */
+  notify?: boolean;
+}
+
+/**
+ * A payment could not be started for a registration that otherwise succeeded.
+ * The booking itself is still created — read `code`/`message` to decide
+ * whether to retry `bookings.payment.start(...)` on the returned booking.
+ */
+export interface BookingEventRegistrationPaymentError {
+  code: string;
+  message: string;
+}
+
+/**
+ * Result of `bookings.events.register(...)`.
+ *
+ * `payment` is `null` when the registration's service needs no payment.
+ * `manage_token` is SHOW-ONCE, exactly like {@link CreatedBooking.manage_token}
+ * — persist it here or it is gone.
+ */
+export interface BookingEventRegistrationResult {
+  booking: Booking;
+  manage_token?: string;
+  payment: BookingPaymentStart | null;
+  payment_error?: BookingEventRegistrationPaymentError;
 }
