@@ -4382,6 +4382,34 @@ components:
           type: string
         birth_year:
           type: integer
+    PortalPerson:
+      description: >-
+        A person the contact books for — a child, a pet — with no login of
+        its own.
+      type: object
+      required: [person_id, name, birth_year, relation_type, relation_label, notes]
+      properties:
+        person_id:
+          type: string
+        name:
+          type: string
+        birth_year:
+          type: [integer, "null"]
+        relation_type:
+          $ref: "#/components/schemas/RelationType"
+        relation_label:
+          type: [string, "null"]
+        notes:
+          type: [string, "null"]
+    PortalLabels:
+      description: The workspace's own words for the person concept, e.g. `"Barn"`.
+      type: object
+      required: [person, persons]
+      properties:
+        person:
+          type: string
+        persons:
+          type: string
     PortalProfile:
       type: object
       required:
@@ -4391,6 +4419,8 @@ components:
         - last_name
         - phone
         - family
+        - persons
+        - labels
         - marketing_consent
         - created_at
       properties:
@@ -4408,6 +4438,12 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/PortalFamilyMember"
+        persons:
+          type: array
+          items:
+            $ref: "#/components/schemas/PortalPerson"
+        labels:
+          $ref: "#/components/schemas/PortalLabels"
         marketing_consent:
           type: boolean
         created_at:

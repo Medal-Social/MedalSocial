@@ -2410,6 +2410,20 @@ export interface components {
       name: string;
       birth_year: number;
     };
+    /** @description A person the contact books for — a child, a pet — with no login of its own. */
+    PortalPerson: {
+      person_id: string;
+      name: string;
+      birth_year: number | null;
+      relation_type: components["schemas"]["RelationType"];
+      relation_label: string | null;
+      notes: string | null;
+    };
+    /** @description The workspace's own words for the person concept, e.g. `"Barn"`. */
+    PortalLabels: {
+      person: string;
+      persons: string;
+    };
     PortalProfile: {
       contact_id: string;
       email: string;
@@ -2417,6 +2431,8 @@ export interface components {
       last_name: string | null;
       phone: string | null;
       family: components["schemas"]["PortalFamilyMember"][];
+      persons: components["schemas"]["PortalPerson"][];
+      labels: components["schemas"]["PortalLabels"];
       marketing_consent: boolean;
       /** @description Unix timestamp in milliseconds. */
       created_at: number;

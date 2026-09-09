@@ -1,4 +1,4 @@
-import type { BookingStatus } from "./bookings";
+import type { BookingStatus, RelationType } from "./bookings";
 
 /** Input for starting an e-mail one-time-code login. */
 export interface PortalLoginStartInput {
@@ -48,6 +48,22 @@ export interface PortalFamilyMember {
   birth_year: number;
 }
 
+/** A person the contact books for — a child, a pet — with no login of its own. */
+export interface PortalPerson {
+  person_id: string;
+  name: string;
+  birth_year: number | null;
+  relation_type: RelationType;
+  relation_label: string | null;
+  notes: string | null;
+}
+
+/** The workspace's own words for the person concept, e.g. `"Barn"`. */
+export interface PortalLabels {
+  person: string;
+  persons: string;
+}
+
 /** The signed-in contact's own profile. */
 export interface PortalProfile {
   contact_id: string;
@@ -56,6 +72,8 @@ export interface PortalProfile {
   last_name: string | null;
   phone: string | null;
   family: PortalFamilyMember[];
+  persons: PortalPerson[];
+  labels: PortalLabels;
   marketing_consent: boolean;
   /** Unix timestamp in milliseconds. */
   created_at: number;
