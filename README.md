@@ -272,6 +272,29 @@ if (summary.can_reschedule) {
 
 `update(id, input)` requires at least one of `notes` / `internal_notes`; `update(id, {})` is a compile error, matching the API's own 400.
 
+#### Persons, relations and events
+
+`medal.bookings.persons` are the children, pets, or employees a contact books for — no login of their own. `medal.bookings.relations` links two contacts directionally (guardian, employer, partner, and so on). `medal.bookings.events` are arrangementer — scheduled group sessions bookings register against; registering a booking *to* an event ships in a later release, so this is a read/create surface today.
+
+```ts
+// Persons a contact books for (active-only unless include_inactive)
+const { data: persons } = await medal.bookings.persons.list(contact.id);
+
+// Add a person under a contact
+const { data: person } = await medal.bookings.persons.create({
+  contact_id: contact.id,
+  name: 'Ola',
+  birth_year: 2018,
+  relation_type: 'guardian',
+});
+
+// Events in a date range (yyyy-mm-dd, inclusive) — one month
+const { data: events } = await medal.bookings.events.list({
+  from: '2026-09-01',
+  to: '2026-09-30',
+});
+```
+
 ### Customer portal
 
 Self-service for the workspace's own customers: they sign in with an e-mailed one-time code, then see and change their profile, list their bookings, export their data, or erase their account. The API key needs `read:portal` and `write:portal`.
@@ -291,6 +314,8 @@ const { data: session } = await medal.portal.login.verify({ email: 'ida@example.
 
 // 3. Session-bound calls, from your server, with the token read back from the cookie
 const { data: me } = await medal.portal.me(session.session_token);
+// me.persons (the contact's bookings.persons) and me.labels (the workspace's own
+// words for the person concept, e.g. { person: 'Barn', persons: 'Barn' }) are new
 const { data: bookings } = await medal.portal.myBookings(session.session_token);
 // bookings.upcoming[i].manage_token is set while the booking is still manageable —
 // it opens your site's manage page (medal.bookings.manage.*); past bookings carry null

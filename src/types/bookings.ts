@@ -45,6 +45,12 @@ export interface Booking {
   booked_for_name: string | null;
   /** Birth year (not a birthdate) of whoever the appointment is for. */
   booked_for_birth_year: number | null;
+  /** The {@link ContactPerson} this booking was made for, if any. */
+  booked_for_person_id: string | null;
+  /** The {@link BookingEvent} this booking is a registration for, if any. */
+  event_id: string | null;
+  /** Position of this booking within its event's registrations, if any. */
+  event_order: number | null;
   /** Shared by every booking created in the same party request. */
   party_sequence_id: string | null;
   status: BookingStatus;
@@ -135,6 +141,8 @@ export interface CreateBookingItemInput {
   booked_for_name?: string;
   /** Birth year (not a birthdate) of whoever the appointment is for. */
   booked_for_birth_year?: number;
+  /** Book this line on behalf of a {@link ContactPerson} rather than the contact. */
+  booked_for_person_id?: string;
 }
 
 /** The person the booking is made under. Phone is the CRM dedupe key. */
@@ -328,4 +336,128 @@ export interface BookingAvailabilityOptions {
   to_ts: BookingTimestampInput;
   /** Restrict slots to one resource. Defaults to every capable resource. */
   resource_id?: string;
+}
+
+/** How a {@link ContactPerson} or {@link ContactRelation} relates to a contact. */
+export type RelationType = "guardian" | "owner" | "employer" | "caregiver" | "partner" | "custom";
+
+/** A person a contact books for — a child, a pet, an employee. No login of its own. */
+export interface ContactPerson {
+  person_id: string;
+  contact_id: string;
+  name: string;
+  birth_year: number | null;
+  relation_type: RelationType;
+  relation_label: string | null;
+  notes: string | null;
+  active: boolean;
+  promoted_to_contact_id: string | null;
+  /** ISO 8601. */
+  created_at: string;
+  /** ISO 8601. */
+  updated_at: string;
+}
+
+/** Input for `bookings.persons.create(...)`. */
+export interface CreateContactPersonInput {
+  contact_id: string;
+  name: string;
+  birth_year?: number;
+  relation_type: RelationType;
+  relation_label?: string;
+  notes?: string;
+}
+
+/** One directional relation between two contacts. */
+export interface ContactRelation {
+  relation_id: string;
+  from_contact_id: string;
+  to_contact_id: string;
+  type: RelationType;
+  custom_label: string | null;
+  since: number | null;
+  note: string | null;
+  /** Empty string when the counterpart contact no longer exists. */
+  counterpart_name: string;
+  /** ISO 8601. */
+  created_at: string;
+}
+
+/** Relations a contact holds, split by direction. */
+export interface ContactRelations {
+  outgoing: ContactRelation[];
+  incoming: ContactRelation[];
+}
+
+/** Input for `bookings.relations.create(...)`. */
+export interface CreateContactRelationInput {
+  from_contact_id: string;
+  to_contact_id: string;
+  type: RelationType;
+  custom_label?: string;
+  since?: number;
+  note?: string;
+}
+
+/** Result of `bookings.relations.create(...)`. */
+export interface CreateContactRelationResult {
+  relation_id: string;
+}
+
+/** Lifecycle state of an arrangement. */
+export type BookingEventStatus = "draft" | "open" | "closed" | "completed" | "cancelled";
+
+/** Which prebuilt template an arrangement was created from. */
+export type BookingEventTemplateKey =
+  | "kindergarten_visit"
+  | "company_day"
+  | "class"
+  | "open_day"
+  | "custom";
+
+/** An arrangement — a scheduled group session bookings register against. */
+export interface BookingEvent {
+  event_id: string;
+  template_id: string;
+  host_id: string | null;
+  /** yyyy-mm-dd in the workspace time zone. */
+  date: string;
+  window_start_minute: number;
+  window_end_minute: number;
+  place: "at_host" | "in_house";
+  capacity: number;
+  minimum: number;
+  registered_count: number;
+  service_ids: string[];
+  resource_ids: string[];
+  price_override_ore: number | null;
+  status: BookingEventStatus;
+  /** ISO 8601. */
+  registration_closes_at: string;
+  slug: string;
+  /** ISO 8601. */
+  created_at: string;
+  /** ISO 8601. */
+  updated_at: string;
+}
+
+/** Options for `bookings.events.list(...)`. The window is `yyyy-mm-dd`, inclusive. */
+export interface ListBookingEventsOptions {
+  from: string;
+  to: string;
+  status?: BookingEventStatus;
+}
+
+/** Input for `bookings.events.create(...)`. */
+export interface CreateBookingEventInput {
+  template_key: BookingEventTemplateKey;
+  host_id?: string;
+  date: string;
+  window_start_minute: number;
+  window_end_minute?: number;
+  place: "at_host" | "in_house";
+  capacity?: number;
+  minimum?: number;
+  service_ids: string[];
+  resource_ids: string[];
 }
