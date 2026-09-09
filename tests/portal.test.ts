@@ -144,6 +144,7 @@ describe("portal", () => {
           relation_type: "guardian",
           relation_label: null,
           notes: null,
+          active: true,
         },
       ],
       labels: { person: "Barn", persons: "Barn" },

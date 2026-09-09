@@ -770,7 +770,7 @@ export interface paths {
     put?: never;
     /**
      * Export everything held about the signed-in contact
-     * @description A synchronous GDPR Art. 15 export of the contact's profile, family, consents and bookings, as one JSON document. Read-only, so not idempotency-keyed. Errors: `401 PORTAL_SESSION_REQUIRED`, `401 PORTAL_SESSION_INVALID`, `403 FORBIDDEN`, `429 RATE_LIMITED`.
+     * @description A synchronous GDPR Art. 15 export of the contact's profile, family, consents and bookings, as one JSON document. Unlike `GET /api/v1/portal/me`, `contact.persons` here includes inactive persons so the export is a complete dump. Read-only, so not idempotency-keyed. Errors: `401 PORTAL_SESSION_REQUIRED`, `401 PORTAL_SESSION_INVALID`, `403 FORBIDDEN`, `429 RATE_LIMITED`.
      */
     post: operations["exportPortalData"];
     delete?: never;
@@ -2418,6 +2418,8 @@ export interface components {
       relation_type: components["schemas"]["RelationType"];
       relation_label: string | null;
       notes: string | null;
+      /** @description False for a person the customer removed or that was promoted to its own contact; `me` returns active persons only, the export returns all. */
+      active: boolean;
     };
     /** @description The workspace's own words for the person concept, e.g. `"Barn"`. */
     PortalLabels: {

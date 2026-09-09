@@ -56,6 +56,8 @@ export interface PortalPerson {
   relation_type: RelationType;
   relation_label: string | null;
   notes: string | null;
+  /** `false` for a person the customer removed or that was promoted to its own contact; `me` returns active persons only, the export returns all. */
+  active: boolean;
 }
 
 /** The workspace's own words for the person concept, e.g. `"Barn"`. */
