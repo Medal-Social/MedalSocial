@@ -64,6 +64,7 @@ const versionState = async (name, version) => {
   return "unknown";
 };
 
+/** @returns {Promise<number>} the CLI's exit code */
 const runJsrPublish = () =>
   new Promise((resolve) => {
     const child = spawn("pnpm", ["exec", "jsr", "publish"], {

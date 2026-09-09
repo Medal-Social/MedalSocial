@@ -63,8 +63,16 @@ jobs:
 
       # JSR is a second registry, published after npm and after the tag and
       # GitHub release exist. It runs on its own so a JSR-side failure cannot
-      # take the npm release with it, and the script is idempotent so re-running
-      # this job is safe.
+      # take the npm release with it.
+      #
+      # Deliberately not gated on `steps.changesets.outputs.published`: on a
+      # re-run npm already has the version, so Changesets publishes nothing and
+      # that output is "false" — which would skip the very step the re-run
+      # exists to retry. `pnpm jsr:publish` asks the registry itself and exits
+      # 0 in ~1s when the version is already there, so it is the gate. On a run
+      # that only opens the version PR it is a no-op.
+      #
+      # It still does not run when an earlier step fails: a failed npm publish
+      # should not reach JSR.
       - name: Publish to JSR
-        if: steps.changesets.outputs.published == 'true'
         run: pnpm jsr:publish
