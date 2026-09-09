@@ -54,6 +54,16 @@ const versionState = async (name, version) => {
     warn(`Could not reach ${url}: ${error instanceof Error ? error.message : String(error)}`);
     return "unknown";
   }
+
+  // Only the status matters here, but an unconsumed body holds its connection
+  // open — and `main` can call this twice against the same endpoint. Pipe to a
+  // sink rather than `cancel()`, which frees the socket by destroying the
+  // connection instead of returning it to the pool; same reasoning as the
+  // drain in `BaseClient.request`.
+  await (response.body ? response.body.pipeTo(new WritableStream()) : response.text()).catch(
+    () => {},
+  );
+
   if (response.ok) {
     return "published";
   }
