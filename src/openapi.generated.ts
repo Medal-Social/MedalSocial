@@ -2688,6 +2688,8 @@ export interface components {
       promoted_to_contact_id: string | null;
       /** Format: date-time */
       created_at: string | null;
+      /** Format: date-time */
+      updated_at: string | null;
     };
     CreateContactPersonInput: {
       contact_id: string;
@@ -2758,6 +2760,8 @@ export interface components {
       slug: string;
       /** Format: date-time */
       created_at: string | null;
+      /** Format: date-time */
+      updated_at: string | null;
     };
     CreateBookingEventInput: {
       template_key: components["schemas"]["BookingEventTemplateKey"];

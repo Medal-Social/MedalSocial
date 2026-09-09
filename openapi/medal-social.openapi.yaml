@@ -4968,6 +4968,7 @@ components:
         - active
         - promoted_to_contact_id
         - created_at
+        - updated_at
       properties:
         person_id:
           type: string
@@ -4988,6 +4989,9 @@ components:
         promoted_to_contact_id:
           type: [string, "null"]
         created_at:
+          type: [string, "null"]
+          format: date-time
+        updated_at:
           type: [string, "null"]
           format: date-time
     CreateContactPersonInput:
@@ -5103,6 +5107,7 @@ components:
         - registration_closes_at
         - slug
         - created_at
+        - updated_at
       properties:
         event_id:
           type: string
@@ -5145,6 +5150,9 @@ components:
         slug:
           type: string
         created_at:
+          type: [string, "null"]
+          format: date-time
+        updated_at:
           type: [string, "null"]
           format: date-time
     CreateBookingEventInput:

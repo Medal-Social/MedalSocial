@@ -354,6 +354,8 @@ export interface ContactPerson {
   promoted_to_contact_id: string | null;
   /** ISO 8601. */
   created_at: string | null;
+  /** ISO 8601. */
+  updated_at: string | null;
 }
 
 /** Input for `bookings.persons.create(...)`. */
@@ -434,6 +436,8 @@ export interface BookingEvent {
   slug: string;
   /** ISO 8601. */
   created_at: string | null;
+  /** ISO 8601. */
+  updated_at: string | null;
 }
 
 /** Options for `bookings.events.list(...)`. The window is `yyyy-mm-dd`, inclusive. */

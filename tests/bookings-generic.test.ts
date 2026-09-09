@@ -29,6 +29,7 @@ describe("bookings generic model (SP11)", () => {
               active: true,
               promoted_to_contact_id: null,
               created_at: "2026-09-09T00:00:00.000Z",
+              updated_at: "2026-09-09T00:00:00.000Z",
             },
           ],
         });
@@ -52,6 +53,7 @@ describe("bookings generic model (SP11)", () => {
               active: true,
               promoted_to_contact_id: null,
               created_at: "2026-09-09T00:00:01.000Z",
+              updated_at: "2026-09-09T00:00:01.000Z",
             },
           },
           201,
@@ -123,7 +125,9 @@ describe("bookings generic model (SP11)", () => {
         return mockJson({ data: [] });
       }
       if (url.endsWith("/api/v1/bookings/events/e1")) {
-        return mockJson({ data: { event_id: "e1", slug: "x", status: "open" } });
+        return mockJson({
+          data: { event_id: "e1", slug: "x", status: "open", updated_at: null },
+        });
       }
       throw new Error(`unexpected ${url}`);
     });
