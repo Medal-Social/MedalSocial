@@ -23,6 +23,29 @@ export type BookingCancelledBy = "customer" | "staff" | "system";
 /** Payment state of a booking. */
 export type BookingPaymentStatus = "none" | "reserved" | "captured" | "refunded";
 
+/**
+ * What a booking must have paid before the business honours it: nothing, a
+ * reservation taken at booking time and captured later, or the full amount up
+ * front.
+ */
+export type BookingPaymentMode = "none" | "reserve" | "prepay";
+
+/**
+ * The state of one attempt at paying for a booking.
+ *
+ * This is Medal's vocabulary, not the wallet's — a Vipps payment stays
+ * `AUTHORIZED` after a capture, so read the øre aggregates on
+ * {@link BookingPayment} to learn what actually moved.
+ */
+export type BookingPaymentState =
+  | "created"
+  | "authorized"
+  | "captured"
+  | "cancelled"
+  | "refunded"
+  | "failed"
+  | "expired";
+
 /** Surface a booking was created through. API-created bookings are `api`. */
 export type BookingCreatedVia = "web" | "dashboard" | "walk_in" | "api";
 
@@ -59,6 +82,13 @@ export interface Booking {
   /** Set on the booking a reschedule created, pointing at the one it replaced. */
   rescheduled_from_id: string | null;
   payment_status: BookingPaymentStatus;
+  /**
+   * What this booking required when it was made — frozen at creation, so
+   * changing the workspace or service rule later does not rewrite history.
+   * `payment_status` alone cannot tell "owes nothing" from "has not paid yet";
+   * this is the field that does.
+   */
+  payment_mode: BookingPaymentMode;
   /** Price in integer øre. */
   amount_ore: number | null;
   /** Customer-visible note. */
@@ -85,6 +115,11 @@ export interface BookingService {
   /** Resource types this service needs, e.g. `["staff"]`. */
   resource_requirements: string[];
   bookable_online: boolean;
+  /**
+   * Per-service payment requirement. `null` means "no override" — the
+   * workspace rule decides.
+   */
+  payment: BookingPaymentMode | null;
   max_per_booking: number | null;
   color: string | null;
   sort_order: number | null;
@@ -240,6 +275,12 @@ export interface ManageSummary {
   /** Price in integer øre. */
   amount_ore: number | null;
   payment_status: BookingPaymentStatus | null;
+  /**
+   * What this booking requires. `payment_status: "none"` is the same answer
+   * for a booking that owes nothing and one that has not paid yet, so this is
+   * what a manage page checks before offering «Betal nå».
+   */
+  payment_mode: BookingPaymentMode;
   /** IANA zone the booking's local times should be rendered in. */
   time_zone: string | null;
   cancel_window_hours: number | null;
@@ -278,6 +319,81 @@ export interface CancelBookingInput {
 export interface RescheduleBookingInput {
   new_start_ts: BookingTimestampInput;
   new_resource_id?: string;
+}
+
+/**
+ * One payment attempt on a booking.
+ *
+ * Money is integer øre, and the four aggregates are numbers rather than nulls:
+ * "nothing has been captured" is `0`, so summing them never needs a null
+ * guard. `redirect_url` is deliberately absent — it is handed over once by
+ * {@link BookingPaymentStart} and never re-read.
+ */
+export interface BookingPayment {
+  reference: string;
+  provider: "vipps";
+  state: BookingPaymentState;
+  mode: Exclude<BookingPaymentMode, "none">;
+  /** 1 for the first attempt on this booking, incrementing per retry. */
+  attempt: number;
+  /** The amount the attempt is for, in integer øre. */
+  amount_ore: number;
+  authorized_ore: number;
+  captured_ore: number;
+  refunded_ore: number;
+  cancelled_ore: number;
+  currency: "NOK";
+  /**
+   * The last moment a capture is GUARANTEED to succeed. The card behind the
+   * wallet may release the reservation after this, so a capture past it can
+   * fail even though the payment still looks authorized. Null until the
+   * customer has approved.
+   */
+  capture_guaranteed_until: string | null;
+  terms_version: string | null;
+  terms_accepted_at: string | null;
+  /**
+   * The wallet's numeric error code from the last failed operation. Branch on
+   * this; the human-readable reason and the trace id stay in Medal's own logs.
+   */
+  failure_code: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+/** What `payment.start(...)` hands back. The redirect URL is shown ONCE. */
+export interface BookingPaymentStart {
+  reference: string;
+  /**
+   * Send the customer here UNCHANGED — hand it to the Vipps Widget SDK, do not
+   * put it in an iframe of your own and do not rewrite it. It is not returned
+   * again by `payment.get(...)`: the payment behind it expires after ten
+   * minutes, so a cached redirect leads into a payment that no longer exists.
+   * Start a new attempt instead of caching this.
+   */
+  redirect_url: string;
+  state: BookingPaymentState;
+}
+
+/** Input for `bookings.payment.start(...)` and its manage-token twin. */
+export interface StartBookingPaymentInput {
+  /**
+   * Where the wallet returns the customer. Must be a URL one of your own sites
+   * vouches for — anything else is refused with 422, not 400: the URL is
+   * well-formed, it is just not yours.
+   */
+  return_url: string;
+  /**
+   * REQUIRED, and must be `true`. The customer has to actively accept your
+   * terms BEFORE a payment is initiated — sending them to a payment link with
+   * no acceptance step makes the integration non-compliant, so the API refuses
+   * a body that omits it or sends `false` with a 400.
+   */
+  terms_accepted: true;
+  /** Your own version label for the terms they accepted. */
+  terms_version?: string;
+  /** The exact text they accepted, stored with the consent record. */
+  terms_text?: string;
 }
 
 /**
