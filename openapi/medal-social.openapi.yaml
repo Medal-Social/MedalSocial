@@ -842,6 +842,11 @@ paths:
           in: query
           schema:
             $ref: "#/components/schemas/BookingEventStatus"
+        - name: host_id
+          in: query
+          description: Restrict to arrangementer at one host.
+          schema:
+            type: string
       responses:
         "200":
           description: Arrangementer in the window.
@@ -884,6 +889,37 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiResponse_BookingEvent"
+        default:
+          $ref: "#/components/responses/ApiError"
+  /api/v1/bookings/events/{id}/registrations:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    post:
+      tags: [Bookings]
+      operationId: registerBookingEvent
+      summary: Register a child for an arrangement
+      description: >-
+        Registers a guardian's child for the arrangement. Lands as a Booking
+        with `event_id` set; when the arrangement's service requires payment,
+        `payment` carries the same show-once redirect `startBookingPayment`
+        does. A payment failure does not undo the registration — the booking
+        is still created and `payment_error` explains what to retry. 404 on an
+        unknown or another workspace's arrangement, 409 once the arrangement
+        is full or closed, 422 on a `return_url` this workspace's own sites do
+        not vouch for.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterBookingEventInput"
+      responses:
+        "201":
+          description: The created registration.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse_BookingEventRegistrationResult"
         default:
           $ref: "#/components/responses/ApiError"
   /api/v1/bookings/{id}:
@@ -5493,6 +5529,93 @@ components:
           type: array
           items:
             type: string
+    RegisterBookingEventGuardianInput:
+      description: The guardian registering a child for an arrangement. Phone is the CRM dedupe key.
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          maxLength: 200
+        email:
+          type: string
+          maxLength: 320
+        phone:
+          type: string
+          maxLength: 40
+    RegisterBookingEventChildInput:
+      description: The child being registered. Birth year, not a birthdate.
+      type: object
+      required: [name, birth_year]
+      properties:
+        name:
+          type: string
+          maxLength: 200
+        birth_year:
+          type: integer
+          minimum: 1900
+          maximum: 2200
+    RegisterBookingEventInput:
+      description: Body for `registerBookingEvent`.
+      type: object
+      required: [guardian, child, service_id, consent_accepted]
+      properties:
+        guardian:
+          $ref: "#/components/schemas/RegisterBookingEventGuardianInput"
+        child:
+          $ref: "#/components/schemas/RegisterBookingEventChildInput"
+        service_id:
+          type: string
+        note:
+          type: string
+          maxLength: 2000
+        consent_accepted:
+          description: >-
+            Must be literally `true`. The guardian has to actively consent
+            before the registration is recorded, so omitting it or sending
+            `false` is a 400.
+          const: true
+          type: boolean
+        return_url:
+          description: >-
+            Where the wallet returns the guardian, when the registration
+            starts a payment. Must be a URL one of this workspace's own sites
+            vouches for; anything else answers 422.
+          type: string
+          minLength: 1
+          maxLength: 2048
+        notify:
+          description: Whether to notify the guardian once the registration is recorded.
+          type: boolean
+    BookingEventRegistrationPaymentError:
+      description: >-
+        A payment could not be started for a registration that otherwise
+        succeeded. The booking is still created.
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+    BookingEventRegistrationResult:
+      description: Result of `registerBookingEvent`. `payment` is `null` when the service needs no payment.
+      type: object
+      required: [booking, payment]
+      properties:
+        booking:
+          $ref: "#/components/schemas/Booking"
+        manage_token:
+          description: >-
+            Show-once secret for the guardian's manage link. Only its hash is
+            stored, and an idempotent replay omits this field entirely.
+          type: string
+        payment:
+          oneOf:
+            - $ref: "#/components/schemas/BookingPaymentStart"
+            - type: "null"
+        payment_error:
+          $ref: "#/components/schemas/BookingEventRegistrationPaymentError"
     ApiResponse_ContactPersonArray:
       $ref: "#/components/schemas/Envelope_ContactPersonArray"
     ApiResponse_ContactPerson:
@@ -5505,6 +5628,8 @@ components:
       $ref: "#/components/schemas/Envelope_BookingEventArray"
     ApiResponse_BookingEvent:
       $ref: "#/components/schemas/Envelope_BookingEvent"
+    ApiResponse_BookingEventRegistrationResult:
+      $ref: "#/components/schemas/Envelope_BookingEventRegistrationResult"
     Envelope_ContactPersonArray:
       type: object
       required: [data]
@@ -5545,3 +5670,9 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/BookingEvent"
+    Envelope_BookingEventRegistrationResult:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/BookingEventRegistrationResult"

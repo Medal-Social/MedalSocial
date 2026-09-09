@@ -42,7 +42,7 @@ Errors throw `MedalApiError` (see the `client` skill for details).
 | `medal.bookings.manage.payment` | `src/resources/bookings.ts` (`BookingsManagePayment`) | `start(token, input, opts?)`, `get(token)` — the same two, on the customer's behalf |
 | `medal.bookings.persons` | `src/resources/bookings.ts` (`BookingsPersons`) | `list(contactId, { include_inactive? })`, `create(input)` — persons a contact books for (children, pets, employees) |
 | `medal.bookings.relations` | `src/resources/bookings.ts` (`BookingsRelations`) | `list(contactId)` → `{ outgoing, incoming }`, `create(input)` — directional relations between contacts |
-| `medal.bookings.events` | `src/resources/bookings.ts` (`BookingsEvents`) | `list({ from, to, status? })`, `get(id)`, `create(input)` — arrangementer (scheduled group sessions); registering a booking to an event ships in a later release |
+| `medal.bookings.events` | `src/resources/bookings.ts` (`BookingsEvents`) | `list({ from, to, status?, host_id? })`, `get(id)`, `create(input)`, `register(id, input, opts?)` — arrangementer (scheduled group sessions); `register` enrolls a child, optionally starting a Vipps payment |
 | `medal.contacts` | `src/resources/contacts.ts` | `list(opts?)`, `create(input)`, `get(id)`, `update(id, input)`, `remove(id)`, `activities(id, opts?)`, `addNote(id, { content })`, `import(contacts[])` |
 | `medal.deals` | `src/resources/deals.ts` | `list(opts?)`, `create(input)`, `get(id)`, `update(id, input)`, `remove(id)` |
 | `medal.emails.templates` | `src/resources/emails.ts` (`EmailTemplates`) | `list()`, `get(slug, opts?)` |

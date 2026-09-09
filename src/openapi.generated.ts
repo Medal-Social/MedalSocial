@@ -494,6 +494,28 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/bookings/events/{id}/registrations": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["parameters"]["Id"];
+      };
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Register a child for an arrangement
+     * @description Registers a guardian's child for the arrangement. Lands as a Booking with `event_id` set; when the arrangement's service requires payment, `payment` carries the same show-once redirect `startBookingPayment` does. A payment failure does not undo the registration — the booking is still created and `payment_error` explains what to retry. 404 on an unknown or another workspace's arrangement, 409 once the arrangement is full or closed, 422 on a `return_url` this workspace's own sites do not vouch for.
+     */
+    post: operations["registerBookingEvent"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/bookings/{id}": {
     parameters: {
       query?: never;
@@ -2934,12 +2956,53 @@ export interface components {
       service_ids: string[];
       resource_ids: string[];
     };
+    /** @description The guardian registering a child for an arrangement. Phone is the CRM dedupe key. */
+    RegisterBookingEventGuardianInput: {
+      name: string;
+      email?: string;
+      phone?: string;
+    };
+    /** @description The child being registered. Birth year, not a birthdate. */
+    RegisterBookingEventChildInput: {
+      name: string;
+      birth_year: number;
+    };
+    /** @description Body for `registerBookingEvent`. */
+    RegisterBookingEventInput: {
+      guardian: components["schemas"]["RegisterBookingEventGuardianInput"];
+      child: components["schemas"]["RegisterBookingEventChildInput"];
+      service_id: string;
+      note?: string;
+      /**
+       * @description Must be literally `true`. The guardian has to actively consent before the registration is recorded, so omitting it or sending `false` is a 400.
+       * @constant
+       */
+      consent_accepted: true;
+      /** @description Where the wallet returns the guardian, when the registration starts a payment. Must be a URL one of this workspace's own sites vouches for; anything else answers 422. */
+      return_url?: string;
+      /** @description Whether to notify the guardian once the registration is recorded. */
+      notify?: boolean;
+    };
+    /** @description A payment could not be started for a registration that otherwise succeeded. The booking is still created. */
+    BookingEventRegistrationPaymentError: {
+      code: string;
+      message: string;
+    };
+    /** @description Result of `registerBookingEvent`. `payment` is `null` when the service needs no payment. */
+    BookingEventRegistrationResult: {
+      booking: components["schemas"]["Booking"];
+      /** @description Show-once secret for the guardian's manage link. Only its hash is stored, and an idempotent replay omits this field entirely. */
+      manage_token?: string;
+      payment: components["schemas"]["BookingPaymentStart"] | null;
+      payment_error?: components["schemas"]["BookingEventRegistrationPaymentError"];
+    };
     ApiResponse_ContactPersonArray: components["schemas"]["Envelope_ContactPersonArray"];
     ApiResponse_ContactPerson: components["schemas"]["Envelope_ContactPerson"];
     ApiResponse_ContactRelations: components["schemas"]["Envelope_ContactRelations"];
     ApiResponse_CreateContactRelationResult: components["schemas"]["Envelope_CreateContactRelationResult"];
     ApiResponse_BookingEventArray: components["schemas"]["Envelope_BookingEventArray"];
     ApiResponse_BookingEvent: components["schemas"]["Envelope_BookingEvent"];
+    ApiResponse_BookingEventRegistrationResult: components["schemas"]["Envelope_BookingEventRegistrationResult"];
     Envelope_ContactPersonArray: {
       data: components["schemas"]["ContactPerson"][];
     };
@@ -2957,6 +3020,9 @@ export interface components {
     };
     Envelope_BookingEvent: {
       data: components["schemas"]["BookingEvent"];
+    };
+    Envelope_BookingEventRegistrationResult: {
+      data: components["schemas"]["BookingEventRegistrationResult"];
     };
   };
   responses: {
@@ -3895,6 +3961,8 @@ export interface operations {
         /** @description End of the window, `yyyy-mm-dd`, inclusive. */
         to: string;
         status?: components["schemas"]["BookingEventStatus"];
+        /** @description Restrict to arrangementer at one host. */
+        host_id?: string;
       };
       header?: never;
       path?: never;
@@ -3957,6 +4025,33 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["ApiResponse_BookingEvent"];
+        };
+      };
+      default: components["responses"]["ApiError"];
+    };
+  };
+  registerBookingEvent: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["parameters"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["RegisterBookingEventInput"];
+      };
+    };
+    responses: {
+      /** @description The created registration. */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponse_BookingEventRegistrationResult"];
         };
       };
       default: components["responses"]["ApiError"];

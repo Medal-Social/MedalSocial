@@ -5,6 +5,7 @@ import type {
   BookingAvailabilityOptions,
   BookingCreateResult,
   BookingEvent,
+  BookingEventRegistrationResult,
   BookingPayment,
   BookingPaymentStart,
   BookingRescheduleResult,
@@ -26,6 +27,7 @@ import type {
   ListBookingServicesOptions,
   ListBookingsOptions,
   ManageSummary,
+  RegisterBookingEventInput,
   RescheduleBookingInput,
   StartBookingPaymentInput,
   UpdateBookingInput,
@@ -224,16 +226,15 @@ class BookingsRelations {
 
 /**
  * Arrangementer — scheduled group sessions bookings register against.
- * Registration itself lands in a later release; this is the read/create
- * surface for the events.
  */
 class BookingsEvents {
   constructor(private client: BaseClient) {}
 
-  /** Arrangementer in a date range (`yyyy-mm-dd`, inclusive). */
+  /** Arrangementer in a date range (`yyyy-mm-dd`, inclusive), optionally narrowed to one host or status. */
   async list(options: ListBookingEventsOptions): Promise<ApiResponse<BookingEvent[]>> {
     const params: Record<string, string | undefined> = { from: options.from, to: options.to };
     if (options.status) params.status = options.status;
+    if (options.host_id) params.host_id = options.host_id;
     return this.client.get("/api/v1/bookings/events", params);
   }
 
@@ -248,6 +249,32 @@ class BookingsEvents {
     options?: RequestOptions,
   ): Promise<ApiResponse<BookingEvent>> {
     return this.client.postOnce("/api/v1/bookings/events", input, options);
+  }
+
+  /**
+   * Register a child for an arrangement. The registration lands as a
+   * {@link Booking} with `event_id` set; when the arrangement's service
+   * requires payment, `payment` carries the same show-once redirect
+   * {@link BookingsPayment.start} does — hand it to the Vipps Widget SDK
+   * unchanged. `payment` is `null` when nothing is owed.
+   *
+   * A payment failure does not undo the registration: check `payment_error`
+   * and retry with `bookings.payment.start(booking.id, ...)` on the returned
+   * booking rather than registering again.
+   *
+   * Automatically idempotent: the SDK mints an `Idempotency-Key` so its own
+   * 5xx retries replay instead of registering twice.
+   */
+  async register(
+    id: string,
+    input: RegisterBookingEventInput,
+    options?: RequestOptions,
+  ): Promise<ApiResponse<BookingEventRegistrationResult>> {
+    return this.client.postOnce(
+      `/api/v1/bookings/events/${encodeURIComponent(id)}/registrations`,
+      input,
+      options,
+    );
   }
 }
 
