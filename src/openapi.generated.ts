@@ -770,7 +770,7 @@ export interface paths {
     put?: never;
     /**
      * Export everything held about the signed-in contact
-     * @description A synchronous GDPR Art. 15 export of the contact's profile, family, consents and bookings, as one JSON document. Unlike `GET /api/v1/portal/me`, `contact.persons` here includes inactive persons so the export is a complete dump. Read-only, so not idempotency-keyed. Errors: `401 PORTAL_SESSION_REQUIRED`, `401 PORTAL_SESSION_INVALID`, `403 FORBIDDEN`, `429 RATE_LIMITED`.
+     * @description A synchronous GDPR Art. 15 export of the contact's profile, family, consents and bookings, as one JSON document. Unlike `GET /api/v1/portal/me`, `contact.persons` here includes inactive persons so the export is a complete dump. `relations` lists every relation the contact is a party to, exposing only the counterpart's display name. Read-only, so not idempotency-keyed. Errors: `401 PORTAL_SESSION_REQUIRED`, `401 PORTAL_SESSION_INVALID`, `403 FORBIDDEN`, `429 RATE_LIMITED`.
      */
     post: operations["exportPortalData"];
     delete?: never;
@@ -2482,6 +2482,17 @@ export interface components {
       revoked_at: number | null;
       source: string;
     };
+    /** @description A relation the exporting contact is a party to; only the counterpart's display name is exposed. */
+    PortalExportRelation: {
+      /** @enum {string} */
+      direction: "outgoing" | "incoming";
+      type: components["schemas"]["RelationType"];
+      custom_label: string | null;
+      /** @description Unix timestamp in milliseconds. */
+      since: number | null;
+      note: string | null;
+      counterpart_name: string;
+    };
     /** @description Everything the workspace holds about the signed-in contact (GDPR Art. 15). */
     PortalExport: {
       /** @description Unix timestamp in milliseconds. */
@@ -2490,6 +2501,7 @@ export interface components {
       family: components["schemas"]["PortalFamilyMember"][];
       consents: components["schemas"]["PortalConsentRecord"][];
       bookings: components["schemas"]["PortalBooking"][];
+      relations: components["schemas"]["PortalExportRelation"][];
     };
     Envelope_PortalLoginStartResult: {
       data: components["schemas"]["PortalLoginStartResult"];

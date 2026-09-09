@@ -349,6 +349,7 @@ export type {
   PortalConsentRecord,
   PortalContactSummary,
   PortalExport,
+  PortalExportRelation,
   PortalFamilyMember,
   PortalLabels,
   PortalLoginStartInput,

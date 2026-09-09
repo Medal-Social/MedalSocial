@@ -96,6 +96,7 @@ describe("portal", () => {
             family: profile.family,
             consents: [],
             bookings: [],
+            relations: [],
           },
         });
       }
@@ -253,6 +254,16 @@ describe("portal", () => {
             },
           ],
           bookings: [],
+          relations: [
+            {
+              direction: "outgoing",
+              type: "guardian",
+              custom_label: null,
+              since: null,
+              note: null,
+              counterpart_name: "Ola",
+            },
+          ],
         },
       });
     });
@@ -260,6 +271,7 @@ describe("portal", () => {
     const { data } = await medal.portal.exportMyData(SESSION);
     expect(data.contact.contact_id).toBe("c_1");
     expect(data.consents[0].source).toBe("portal");
+    expect(data.relations[0].counterpart_name).toBe("Ola");
   });
 
   it("resolves logout to undefined on a 204", async () => {

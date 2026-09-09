@@ -134,6 +134,16 @@ export interface PortalConsentRecord {
   source: string;
 }
 
+/** A relation the exporting contact is a party to; only the counterpart's display name is exposed. */
+export interface PortalExportRelation {
+  direction: "outgoing" | "incoming";
+  type: RelationType;
+  custom_label: string | null;
+  since: number | null;
+  note: string | null;
+  counterpart_name: string;
+}
+
 /** Everything the workspace holds about the signed-in contact (GDPR Art. 15). */
 export interface PortalExport {
   /** Unix timestamp in milliseconds. */
@@ -142,4 +152,5 @@ export interface PortalExport {
   family: PortalFamilyMember[];
   consents: PortalConsentRecord[];
   bookings: PortalBooking[];
+  relations: PortalExportRelation[];
 }
