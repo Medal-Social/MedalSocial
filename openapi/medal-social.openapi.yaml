@@ -988,6 +988,98 @@ paths:
                 $ref: "#/components/schemas/ApiResponse_BookingActionResult"
         default:
           $ref: "#/components/responses/ApiError"
+  /api/v1/bookings/{id}/payment:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    post:
+      tags: [Bookings]
+      operationId: startBookingPayment
+      summary: Start a Vipps payment for a booking
+      description: >-
+        Reserves (or charges) the booking's amount and returns the wallet
+        redirect URL. The customer must have accepted your terms before this
+        call — `terms_accepted` must be literally `true`, and a body omitting
+        it is a 400. One live payment per booking: a second while one is
+        outstanding answers 409, as does a booking that is not payable or a
+        refusal from Vipps. A `return_url` this workspace's own sites do not
+        vouch for answers 422, not 400 — the URL parses, it is just not yours.
+        403 when the payments switch or the bookings module is off.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartBookingPaymentInput"
+      responses:
+        "200":
+          description: >-
+            The reference and the SHOW-ONCE redirect URL. The URL is never
+            returned again — the payment behind it expires after ten minutes,
+            so a cached one leads into a payment that no longer exists.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse_BookingPaymentStart"
+        default:
+          $ref: "#/components/responses/ApiError"
+    get:
+      tags: [Bookings]
+      operationId: getBookingPayment
+      summary: Read the newest payment attempt on a booking
+      description: >-
+        Returns the newest attempt only. A booking with no payment yet, an
+        unknown booking id and another workspace's booking all answer 404
+        alike, so this is not an existence oracle.
+      responses:
+        "200":
+          description: The payment. `redirect_url` is deliberately absent here.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse_BookingPayment"
+        default:
+          $ref: "#/components/responses/ApiError"
+  /api/v1/bookings/manage/{token}/payment:
+    parameters:
+      - $ref: "#/components/parameters/ManageToken"
+    post:
+      tags: [Bookings]
+      operationId: startManageBookingPayment
+      summary: Start a payment on the customer's behalf
+      description: >-
+        The manage-token twin of `startBookingPayment` — same body, same
+        responses; only the credential that authorizes it differs.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartBookingPaymentInput"
+      responses:
+        "200":
+          description: The reference and the show-once redirect URL.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse_BookingPaymentStart"
+        default:
+          $ref: "#/components/responses/ApiError"
+    get:
+      tags: [Bookings]
+      operationId: getManageBookingPayment
+      summary: Read the payment on the customer's own booking
+      description: >-
+        An unknown token, another workspace's token and a booking with no
+        payment yet all answer 404 alike.
+      responses:
+        "200":
+          description: The payment. `redirect_url` is deliberately absent here.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse_BookingPayment"
+        default:
+          $ref: "#/components/responses/ApiError"
   /api/v1/bookings/manage/{token}:
     parameters:
       - $ref: "#/components/parameters/ManageToken"
@@ -2785,6 +2877,19 @@ components:
     BookingPaymentStatus:
       type: string
       enum: [none, reserved, captured, refunded]
+    BookingPaymentMode:
+      description: >-
+        What a booking must have paid before the business honours it: nothing,
+        a reservation captured later, or the full amount up front.
+      type: string
+      enum: [none, reserve, prepay]
+    BookingPaymentState:
+      description: >-
+        The state of one payment attempt, in Medal's vocabulary rather than the
+        wallet's — a Vipps payment stays AUTHORIZED after a capture, so read
+        the øre aggregates to learn what actually moved.
+      type: string
+      enum: [created, authorized, captured, cancelled, refunded, failed, expired]
     BookingCreatedVia:
       type: string
       enum: [web, dashboard, walk_in, api]
@@ -2811,6 +2916,7 @@ components:
         - cancel_reason
         - rescheduled_from_id
         - payment_status
+        - payment_mode
         - amount_ore
         - notes
         - internal_notes
@@ -2862,6 +2968,12 @@ components:
           type: [string, "null"]
         payment_status:
           $ref: "#/components/schemas/BookingPaymentStatus"
+        payment_mode:
+          description: >-
+            What this booking required when it was made — frozen at creation.
+            `payment_status: none` cannot tell "owes nothing" from "has not
+            paid yet"; this can.
+          $ref: "#/components/schemas/BookingPaymentMode"
         amount_ore:
           description: Price in integer øre. Never a float and never kroner.
           type: [integer, "null"]
@@ -2895,6 +3007,7 @@ components:
         - weekend_surcharge_pct
         - resource_requirements
         - bookable_online
+        - payment
         - max_per_booking
         - color
         - sort_order
@@ -2928,6 +3041,13 @@ components:
             type: string
         bookable_online:
           type: boolean
+        payment:
+          description: >-
+            Per-service payment requirement. `null` means no override — the
+            workspace rule decides.
+          oneOf:
+            - $ref: "#/components/schemas/BookingPaymentMode"
+            - type: "null"
         max_per_booking:
           type: [integer, "null"]
         color:
@@ -3148,6 +3268,7 @@ components:
         - party_sequence_id
         - amount_ore
         - payment_status
+        - payment_mode
         - time_zone
         - cancel_window_hours
         - reschedule_window_hours
@@ -3195,6 +3316,11 @@ components:
           oneOf:
             - $ref: "#/components/schemas/BookingPaymentStatus"
             - type: "null"
+        payment_mode:
+          description: >-
+            What this booking requires — what a manage page checks before
+            offering «Betal nå».
+          $ref: "#/components/schemas/BookingPaymentMode"
         time_zone:
           description: IANA zone the booking's local times should be rendered in.
           type: [string, "null"]
@@ -3259,6 +3385,131 @@ components:
           $ref: "#/components/schemas/BookingTimestampInput"
         new_resource_id:
           type: string
+    StartBookingPaymentInput:
+      description: >-
+        Body for `startBookingPayment` and `startManageBookingPayment`.
+      type: object
+      required: [return_url, terms_accepted]
+      properties:
+        return_url:
+          description: >-
+            Where the wallet returns the customer. Must be a URL one of this
+            workspace's own sites vouches for; anything else answers 422.
+          type: string
+          minLength: 1
+          maxLength: 2048
+        terms_accepted:
+          description: >-
+            Must be literally `true`. The customer has to actively accept the
+            merchant's terms BEFORE a payment is initiated, so omitting it or
+            sending `false` is a 400 and leaves no payment behind.
+          const: true
+          type: boolean
+        terms_version:
+          description: The caller's own version label for the terms that were accepted.
+          type: string
+          minLength: 1
+          maxLength: 64
+        terms_text:
+          description: The exact text that was accepted, stored with the consent record.
+          type: string
+          maxLength: 2000
+    BookingPaymentStart:
+      description: >-
+        The result of starting a payment. `redirect_url` is handed over here
+        and nowhere else.
+      type: object
+      required: [reference, redirect_url, state]
+      properties:
+        reference:
+          description: The wallet reference for this attempt.
+          type: string
+        redirect_url:
+          description: >-
+            Send the customer here UNCHANGED — hand it to the Vipps Widget SDK.
+            SHOW-ONCE: it is not returned by `getBookingPayment`, and the
+            payment behind it expires after ten minutes.
+          type: string
+        state:
+          $ref: "#/components/schemas/BookingPaymentState"
+    BookingPayment:
+      description: >-
+        One payment attempt on a booking. Money is integer øre, and the four
+        aggregates are numbers rather than nulls — "nothing captured" is `0`.
+        `redirect_url`, the wallet's own refusal text and the trace id are
+        deliberately absent.
+      type: object
+      required:
+        - reference
+        - provider
+        - state
+        - mode
+        - attempt
+        - amount_ore
+        - authorized_ore
+        - captured_ore
+        - refunded_ore
+        - cancelled_ore
+        - currency
+        - capture_guaranteed_until
+        - terms_version
+        - terms_accepted_at
+        - failure_code
+        - created_at
+        - updated_at
+      properties:
+        reference:
+          type: string
+        provider:
+          const: vipps
+          type: string
+        state:
+          $ref: "#/components/schemas/BookingPaymentState"
+        mode:
+          description: Never `none` — a payment exists only where one was required.
+          type: string
+          enum: [reserve, prepay]
+        attempt:
+          description: 1 for the first attempt on this booking, incrementing per retry.
+          type: integer
+        amount_ore:
+          description: The amount this attempt is for, in integer øre.
+          type: integer
+        authorized_ore:
+          type: integer
+        captured_ore:
+          type: integer
+        refunded_ore:
+          type: integer
+        cancelled_ore:
+          type: integer
+        currency:
+          const: NOK
+          type: string
+        capture_guaranteed_until:
+          description: >-
+            The last moment a capture is GUARANTEED to succeed. The card behind
+            the wallet may release the reservation afterwards, so a capture
+            past it can fail even though the payment still looks authorized.
+            Null until the customer has approved.
+          type: [string, "null"]
+          format: date-time
+        terms_version:
+          type: [string, "null"]
+        terms_accepted_at:
+          type: [string, "null"]
+          format: date-time
+        failure_code:
+          description: >-
+            The wallet's numeric error code from the last failed operation —
+            what a caller branches on.
+          type: [string, "null"]
+        created_at:
+          type: [string, "null"]
+          format: date-time
+        updated_at:
+          type: [string, "null"]
+          format: date-time
     BookingsPagination:
       description: >-
         Pagination for a bookings page. `truncated` is the extra statement:
@@ -3981,6 +4232,10 @@ components:
       $ref: "#/components/schemas/Envelope_BookingActionResult"
     ApiResponse_BookingRescheduleResult:
       $ref: "#/components/schemas/Envelope_BookingRescheduleResult"
+    ApiResponse_BookingPaymentStart:
+      $ref: "#/components/schemas/Envelope_BookingPaymentStart"
+    ApiResponse_BookingPayment:
+      $ref: "#/components/schemas/Envelope_BookingPayment"
     ApiResponse_ManageSummary:
       $ref: "#/components/schemas/Envelope_ManageSummary"
     ApiResponse_PortalLoginStartResult:
@@ -4318,6 +4573,18 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/BookingRescheduleResult"
+    Envelope_BookingPaymentStart:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/BookingPaymentStart"
+    Envelope_BookingPayment:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/BookingPayment"
     Envelope_ManageSummary:
       type: object
       required: [data]

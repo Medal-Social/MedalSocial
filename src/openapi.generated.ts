@@ -577,6 +577,59 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/bookings/{id}/payment": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["parameters"]["Id"];
+      };
+      cookie?: never;
+    };
+    /**
+     * Read the newest payment attempt on a booking
+     * @description Returns the newest attempt only. A booking with no payment yet, an unknown booking id and another workspace's booking all answer 404 alike, so this is not an existence oracle.
+     */
+    get: operations["getBookingPayment"];
+    put?: never;
+    /**
+     * Start a Vipps payment for a booking
+     * @description Reserves (or charges) the booking's amount and returns the wallet redirect URL. The customer must have accepted your terms before this call — `terms_accepted` must be literally `true`, and a body omitting it is a 400. One live payment per booking: a second while one is outstanding answers 409, as does a booking that is not payable or a refusal from Vipps. A `return_url` this workspace's own sites do not vouch for answers 422, not 400 — the URL parses, it is just not yours. 403 when the payments switch or the bookings module is off.
+     */
+    post: operations["startBookingPayment"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/bookings/manage/{token}/payment": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description The show-once manage token handed out when the booking was created. Possession of it authorizes the customer's own cancel or reschedule. */
+        token: components["parameters"]["ManageToken"];
+      };
+      cookie?: never;
+    };
+    /**
+     * Read the payment on the customer's own booking
+     * @description An unknown token, another workspace's token and a booking with no payment yet all answer 404 alike.
+     */
+    get: operations["getManageBookingPayment"];
+    put?: never;
+    /**
+     * Start a payment on the customer's behalf
+     * @description The manage-token twin of `startBookingPayment` — same body, same responses; only the credential that authorizes it differs.
+     */
+    post: operations["startManageBookingPayment"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/bookings/manage/{token}": {
     parameters: {
       query?: never;
@@ -1675,6 +1728,23 @@ export interface components {
     BookingCancelledBy: "customer" | "staff" | "system";
     /** @enum {string} */
     BookingPaymentStatus: "none" | "reserved" | "captured" | "refunded";
+    /**
+     * @description What a booking must have paid before the business honours it: nothing, a reservation captured later, or the full amount up front.
+     * @enum {string}
+     */
+    BookingPaymentMode: "none" | "reserve" | "prepay";
+    /**
+     * @description The state of one payment attempt, in Medal's vocabulary rather than the wallet's — a Vipps payment stays AUTHORIZED after a capture, so read the øre aggregates to learn what actually moved.
+     * @enum {string}
+     */
+    BookingPaymentState:
+      | "created"
+      | "authorized"
+      | "captured"
+      | "cancelled"
+      | "refunded"
+      | "failed"
+      | "expired";
     /** @enum {string} */
     BookingCreatedVia: "web" | "dashboard" | "walk_in" | "api";
     /** @enum {string} */
@@ -1705,6 +1775,8 @@ export interface components {
       /** @description On a booking created by a reschedule, the booking it replaced. */
       rescheduled_from_id: string | null;
       payment_status: components["schemas"]["BookingPaymentStatus"];
+      /** @description What this booking required when it was made — frozen at creation. `payment_status: none` cannot tell "owes nothing" from "has not paid yet"; this can. */
+      payment_mode: components["schemas"]["BookingPaymentMode"];
       /** @description Price in integer øre. Never a float and never kroner. */
       amount_ore: number | null;
       /** @description Customer-visible note. */
@@ -1731,6 +1803,8 @@ export interface components {
       /** @description Resource types this service needs, e.g. `["staff"]`. */
       resource_requirements: string[];
       bookable_online: boolean;
+      /** @description Per-service payment requirement. `null` means no override — the workspace rule decides. */
+      payment: components["schemas"]["BookingPaymentMode"] | null;
       max_per_booking: number | null;
       color: string | null;
       sort_order: number | null;
@@ -1849,6 +1923,8 @@ export interface components {
       /** @description Price in integer øre. */
       amount_ore: number | null;
       payment_status: components["schemas"]["BookingPaymentStatus"] | null;
+      /** @description What this booking requires — what a manage page checks before offering «Betal nå». */
+      payment_mode: components["schemas"]["BookingPaymentMode"];
       /** @description IANA zone the booking's local times should be rendered in. */
       time_zone: string | null;
       cancel_window_hours: number | null;
@@ -1876,6 +1952,64 @@ export interface components {
     RescheduleBookingInput: {
       new_start_ts: components["schemas"]["BookingTimestampInput"];
       new_resource_id?: string;
+    };
+    /** @description Body for `startBookingPayment` and `startManageBookingPayment`. */
+    StartBookingPaymentInput: {
+      /** @description Where the wallet returns the customer. Must be a URL one of this workspace's own sites vouches for; anything else answers 422. */
+      return_url: string;
+      /**
+       * @description Must be literally `true`. The customer has to actively accept the merchant's terms BEFORE a payment is initiated, so omitting it or sending `false` is a 400 and leaves no payment behind.
+       * @constant
+       */
+      terms_accepted: true;
+      /** @description The caller's own version label for the terms that were accepted. */
+      terms_version?: string;
+      /** @description The exact text that was accepted, stored with the consent record. */
+      terms_text?: string;
+    };
+    /** @description The result of starting a payment. `redirect_url` is handed over here and nowhere else. */
+    BookingPaymentStart: {
+      /** @description The wallet reference for this attempt. */
+      reference: string;
+      /** @description Send the customer here UNCHANGED — hand it to the Vipps Widget SDK. SHOW-ONCE: it is not returned by `getBookingPayment`, and the payment behind it expires after ten minutes. */
+      redirect_url: string;
+      state: components["schemas"]["BookingPaymentState"];
+    };
+    /** @description One payment attempt on a booking. Money is integer øre, and the four aggregates are numbers rather than nulls — "nothing captured" is `0`. `redirect_url`, the wallet's own refusal text and the trace id are deliberately absent. */
+    BookingPayment: {
+      reference: string;
+      /** @constant */
+      provider: "vipps";
+      state: components["schemas"]["BookingPaymentState"];
+      /**
+       * @description Never `none` — a payment exists only where one was required.
+       * @enum {string}
+       */
+      mode: "reserve" | "prepay";
+      /** @description 1 for the first attempt on this booking, incrementing per retry. */
+      attempt: number;
+      /** @description The amount this attempt is for, in integer øre. */
+      amount_ore: number;
+      authorized_ore: number;
+      captured_ore: number;
+      refunded_ore: number;
+      cancelled_ore: number;
+      /** @constant */
+      currency: "NOK";
+      /**
+       * Format: date-time
+       * @description The last moment a capture is GUARANTEED to succeed. The card behind the wallet may release the reservation afterwards, so a capture past it can fail even though the payment still looks authorized. Null until the customer has approved.
+       */
+      capture_guaranteed_until: string | null;
+      terms_version: string | null;
+      /** Format: date-time */
+      terms_accepted_at: string | null;
+      /** @description The wallet's numeric error code from the last failed operation — what a caller branches on. */
+      failure_code: string | null;
+      /** Format: date-time */
+      created_at: string | null;
+      /** Format: date-time */
+      updated_at: string | null;
     };
     /** @description Pagination for a bookings page. `truncated` is the extra statement: the underlying read is capped, and when the cap binds there are matching bookings no cursor from this call reaches — narrow the window. */
     BookingsPagination: {
@@ -2221,6 +2355,8 @@ export interface components {
     ApiResponse_BookingCreateResult: components["schemas"]["Envelope_BookingCreateResult"];
     ApiResponse_BookingActionResult: components["schemas"]["Envelope_BookingActionResult"];
     ApiResponse_BookingRescheduleResult: components["schemas"]["Envelope_BookingRescheduleResult"];
+    ApiResponse_BookingPaymentStart: components["schemas"]["Envelope_BookingPaymentStart"];
+    ApiResponse_BookingPayment: components["schemas"]["Envelope_BookingPayment"];
     ApiResponse_ManageSummary: components["schemas"]["Envelope_ManageSummary"];
     ApiResponse_PortalLoginStartResult: components["schemas"]["Envelope_PortalLoginStartResult"];
     ApiResponse_PortalSession: components["schemas"]["Envelope_PortalSession"];
@@ -2371,6 +2507,12 @@ export interface components {
     };
     Envelope_BookingRescheduleResult: {
       data: components["schemas"]["BookingRescheduleResult"];
+    };
+    Envelope_BookingPaymentStart: {
+      data: components["schemas"]["BookingPaymentStart"];
+    };
+    Envelope_BookingPayment: {
+      data: components["schemas"]["BookingPayment"];
     };
     Envelope_ManageSummary: {
       data: components["schemas"]["ManageSummary"];
@@ -3942,6 +4084,108 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["ApiResponse_BookingActionResult"];
+        };
+      };
+      default: components["responses"]["ApiError"];
+    };
+  };
+  getBookingPayment: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["parameters"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description The payment. `redirect_url` is deliberately absent here. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponse_BookingPayment"];
+        };
+      };
+      default: components["responses"]["ApiError"];
+    };
+  };
+  startBookingPayment: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["parameters"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["StartBookingPaymentInput"];
+      };
+    };
+    responses: {
+      /** @description The reference and the SHOW-ONCE redirect URL. The URL is never returned again — the payment behind it expires after ten minutes, so a cached one leads into a payment that no longer exists. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponse_BookingPaymentStart"];
+        };
+      };
+      default: components["responses"]["ApiError"];
+    };
+  };
+  getManageBookingPayment: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description The show-once manage token handed out when the booking was created. Possession of it authorizes the customer's own cancel or reschedule. */
+        token: components["parameters"]["ManageToken"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description The payment. `redirect_url` is deliberately absent here. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponse_BookingPayment"];
+        };
+      };
+      default: components["responses"]["ApiError"];
+    };
+  };
+  startManageBookingPayment: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description The show-once manage token handed out when the booking was created. Possession of it authorizes the customer's own cancel or reschedule. */
+        token: components["parameters"]["ManageToken"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["StartBookingPaymentInput"];
+      };
+    };
+    responses: {
+      /** @description The reference and the show-once redirect URL. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponse_BookingPaymentStart"];
         };
       };
       default: components["responses"]["ApiError"];
