@@ -136,6 +136,33 @@ Add support for X resource
 - npmjs.com → `@medalsocial/sdk` → Settings → Publishing access → OIDC enabled for `Medal-Social/MedalSocial`
 - GitHub Environment `npm` exists, locked to `prod` branch
 
+### The second registry: JSR
+
+The package also goes to [JSR](https://jsr.io/@medalsocial/sdk), from a
+**separate workflow step** that runs after `changesets/action` — deliberately
+not from inside `pnpm release`. Two reasons:
+
+1. **Tags and GitHub releases must not depend on JSR.** They are created by the
+   changesets action, and anything that fails inside the publish script fails
+   the whole action. `jsr publish` used to sit at the end of `pnpm release`, so
+   a JSR hiccup took the release bookkeeping with it.
+2. **`jsr publish` is not atomic and not re-runnable.** JSR creates the version
+   the moment the tarball is accepted; only *then* does `deno publish` mint the
+   Sigstore provenance attestation. A transient Fulcio/Rekor failure exits
+   non-zero on a version that is already live and immutable — and a plain
+   re-run then dies on "already published".
+
+`pnpm jsr:publish` (`scripts/jsr-publish.mjs`) handles both: it asks
+`https://jsr.io/@medalsocial/sdk/<version>_meta.json` before publishing and
+skips if the version is there, and asks again if the CLI fails — a failure on a
+version the registry already has downgrades to a warning naming the likely
+culprit. Anything else still fails the job. `pnpm jsr:publish --dry-run`
+reports what it would do without publishing.
+
+A version published without provenance has `rekorLogId: null` in
+`https://api.jsr.io/scopes/medalsocial/packages/sdk/versions` — that is how to
+tell an attestation failure from a healthy release after the fact.
+
 ## CI
 
 `.github/workflows/ci.yml` runs on all PRs and pushes to `dev`/`prod`:
