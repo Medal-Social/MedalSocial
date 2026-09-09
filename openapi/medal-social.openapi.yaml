@@ -4988,8 +4988,8 @@ components:
         promoted_to_contact_id:
           type: [string, "null"]
         created_at:
-          type: integer
-          description: Unix timestamp in milliseconds.
+          type: [string, "null"]
+          format: date-time
     CreateContactPersonInput:
       type: object
       required: [contact_id, name, relation_type]
@@ -5038,8 +5038,8 @@ components:
         counterpart_name:
           type: [string, "null"]
         created_at:
-          type: integer
-          description: Unix timestamp in milliseconds.
+          type: [string, "null"]
+          format: date-time
     ContactRelations:
       description: Relations a contact holds, split by direction.
       type: object
@@ -5140,13 +5140,13 @@ components:
         status:
           $ref: "#/components/schemas/BookingEventStatus"
         registration_closes_at:
-          type: integer
-          description: Unix timestamp in milliseconds.
+          type: [string, "null"]
+          format: date-time
         slug:
           type: string
         created_at:
-          type: integer
-          description: Unix timestamp in milliseconds.
+          type: [string, "null"]
+          format: date-time
     CreateBookingEventInput:
       type: object
       required: [template_key, date, window_start_minute, place, service_ids, resource_ids]

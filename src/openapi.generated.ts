@@ -2686,8 +2686,8 @@ export interface components {
       notes: string | null;
       active: boolean;
       promoted_to_contact_id: string | null;
-      /** @description Unix timestamp in milliseconds. */
-      created_at: number;
+      /** Format: date-time */
+      created_at: string | null;
     };
     CreateContactPersonInput: {
       contact_id: string;
@@ -2708,8 +2708,8 @@ export interface components {
       since: number | null;
       note: string | null;
       counterpart_name: string | null;
-      /** @description Unix timestamp in milliseconds. */
-      created_at: number;
+      /** Format: date-time */
+      created_at: string | null;
     };
     /** @description Relations a contact holds, split by direction. */
     ContactRelations: {
@@ -2753,11 +2753,11 @@ export interface components {
       resource_ids: string[];
       price_override_ore: number | null;
       status: components["schemas"]["BookingEventStatus"];
-      /** @description Unix timestamp in milliseconds. */
-      registration_closes_at: number;
+      /** Format: date-time */
+      registration_closes_at: string | null;
       slug: string;
-      /** @description Unix timestamp in milliseconds. */
-      created_at: number;
+      /** Format: date-time */
+      created_at: string | null;
     };
     CreateBookingEventInput: {
       template_key: components["schemas"]["BookingEventTemplateKey"];
