@@ -1,5 +1,13 @@
 # @medalsocial/sdk
 
+## 1.10.0
+
+### Minor Changes
+
+- [#135](https://github.com/Medal-Social/MedalSocial-SDK/pull/135) [`a7c7e2b`](https://github.com/Medal-Social/MedalSocial-SDK/commit/a7c7e2b3900174f87a876884c62892aecf93ee31) Thanks [@alioftech](https://github.com/alioftech)! - Add `medal.bookings.payment.{start,get}` and `medal.bookings.manage.payment.{start,get}`: Vipps payments on a booking, as the business or on the customer's behalf. `start` reserves the booking's amount and returns a one-time wallet redirect URL — hand it to the Vipps Widget SDK unchanged, and learn the outcome from `get` or the booking's `payment_status`, never from the browser's return redirect. `terms_accepted: true` is required: the customer must actively accept your terms before a payment is initiated. `get` returns the newest attempt only and throws a 404 `MedalApiError` when the booking has no payment yet.
+  
+  Also adds `payment_mode` to `Booking` and `ManageSummary` (`"none" | "reserve" | "prepay"`, frozen when the booking was made) and `payment` to `BookingService` (the per-service requirement; `null` means "follow the workspace rule"). Requires a Medal Social API deployment that supports booking payments; older API deployments omit these fields.
+
 ## 1.9.0
 
 ### Minor Changes
