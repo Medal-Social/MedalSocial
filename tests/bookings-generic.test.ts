@@ -34,6 +34,25 @@ describe("bookings generic model (SP11)", () => {
           ],
         });
       }
+      if (url.endsWith("/api/v1/bookings/persons?contact_id=c1&include_inactive=true")) {
+        return mockJson({
+          data: [
+            {
+              person_id: "p3",
+              contact_id: "c1",
+              name: "Retired Rex",
+              birth_year: null,
+              relation_type: "pet",
+              relation_label: null,
+              notes: null,
+              active: false,
+              promoted_to_contact_id: null,
+              created_at: "2026-09-09T00:00:02.000Z",
+              updated_at: "2026-09-09T00:00:02.000Z",
+            },
+          ],
+        });
+      }
       if (url.endsWith("/api/v1/bookings/persons") && init?.method === "POST") {
         expect(JSON.parse(String(init.body))).toEqual({
           contact_id: "c1",
@@ -64,6 +83,8 @@ describe("bookings generic model (SP11)", () => {
     const medal = new Medal("medal_test", { baseUrl: BASE });
     const listed = await medal.bookings.persons.list("c1");
     expect(listed.data[0].name).toBe("Nora");
+    const includingInactive = await medal.bookings.persons.list("c1", { include_inactive: true });
+    expect(includingInactive.data[0].name).toBe("Retired Rex");
     const created = await medal.bookings.persons.create({
       contact_id: "c1",
       name: "Theo",
@@ -135,7 +156,74 @@ describe("bookings generic model (SP11)", () => {
     expect(
       (await medal.bookings.events.list({ from: "2026-10-01", to: "2026-10-31" })).data,
     ).toEqual([]);
+    expect(
+      (
+        await medal.bookings.events.list({
+          from: "2026-10-01",
+          to: "2026-10-31",
+          status: "open",
+        })
+      ).data,
+    ).toEqual([]);
     expect((await medal.bookings.events.get("e1")).data.event_id).toBe("e1");
+    vi.restoreAllMocks();
+  });
+
+  it("events.create posts the body under a minted Idempotency-Key", async () => {
+    let sentKey: string | null = null;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url.endsWith("/api/v1/bookings/events") && init?.method === "POST") {
+        sentKey = new Headers(init.headers).get("idempotency-key");
+        expect(JSON.parse(String(init.body))).toEqual({
+          template_key: "kindergarten_visit",
+          date: "2026-10-15",
+          window_start_minute: 540,
+          window_end_minute: 660,
+          place: "at_host",
+          service_ids: ["svc_1"],
+          resource_ids: ["res_1"],
+        });
+        return mockJson(
+          {
+            data: {
+              event_id: "e2",
+              template_id: "tpl_1",
+              host_id: null,
+              date: "2026-10-15",
+              window_start_minute: 540,
+              window_end_minute: 660,
+              place: "at_host",
+              capacity: 10,
+              minimum: 1,
+              registered_count: 0,
+              service_ids: ["svc_1"],
+              resource_ids: ["res_1"],
+              price_override_ore: null,
+              status: "draft",
+              registration_closes_at: "2026-10-14T00:00:00.000Z",
+              slug: "kindergarten-visit-2026-10-15",
+              created_at: "2026-09-09T00:00:00.000Z",
+              updated_at: "2026-09-09T00:00:00.000Z",
+            },
+          },
+          201,
+        );
+      }
+      throw new Error(`unexpected ${url}`);
+    });
+    const medal = new Medal("medal_test", { baseUrl: BASE });
+    const created = await medal.bookings.events.create({
+      template_key: "kindergarten_visit",
+      date: "2026-10-15",
+      window_start_minute: 540,
+      window_end_minute: 660,
+      place: "at_host",
+      service_ids: ["svc_1"],
+      resource_ids: ["res_1"],
+    });
+    expect(created.data.event_id).toBe("e2");
+    expect(sentKey).toBeTruthy();
     vi.restoreAllMocks();
   });
 });
