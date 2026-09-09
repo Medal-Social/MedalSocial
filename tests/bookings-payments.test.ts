@@ -1,4 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type {
+  BookingPayment,
+  BookingPaymentMode,
+  BookingPaymentStart,
+  BookingPaymentState,
+  StartBookingPaymentInput,
+} from "../src";
 import { Medal } from "../src";
 import { MedalApiError } from "../src/types/common";
 
@@ -153,5 +160,48 @@ describe("bookings.payment (SP8b)", () => {
       `${BASE}/api/v1/bookings/manage/tok%201/payment`,
       `${BASE}/api/v1/bookings/manage/tok%201/payment`,
     ]);
+  });
+
+  it("exports the payment types from the package root", () => {
+    // Compile-time guard: these types must be importable from "../src" (the
+    // package's public entry) so consumers can name them without reaching
+    // into "../src/types/bookings" directly. A regression here fails
+    // typecheck with TS2305, not this assertion.
+    const mode: BookingPaymentMode = "reserve";
+    const state: BookingPaymentState = "authorized";
+    const start: BookingPaymentStart = {
+      reference: "mb-1",
+      redirect_url: "https://vipps.test/redirect/mb-1",
+      state: "created",
+    };
+    const payment: BookingPayment = {
+      reference: "mb-1",
+      provider: "vipps",
+      state: "authorized",
+      mode: "reserve",
+      attempt: 1,
+      amount_ore: 39_000,
+      authorized_ore: 39_000,
+      captured_ore: 0,
+      refunded_ore: 0,
+      cancelled_ore: 0,
+      currency: "NOK",
+      capture_guaranteed_until: null,
+      terms_version: null,
+      terms_accepted_at: null,
+      failure_code: null,
+      created_at: null,
+      updated_at: null,
+    };
+    const input: StartBookingPaymentInput = {
+      return_url: "https://coolkids.no/retur",
+      terms_accepted: true,
+    };
+
+    expect(mode).toBe("reserve");
+    expect(state).toBe("authorized");
+    expect(start.state).toBe("created");
+    expect(payment.mode).toBe("reserve");
+    expect(input.terms_accepted).toBe(true);
   });
 });
