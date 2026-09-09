@@ -38,6 +38,8 @@ Errors throw `MedalApiError` (see the `client` skill for details).
 |---|---|---|
 | `medal.bookings` | `src/resources/bookings.ts` | `listServices(opts?)`, `listResources()`, `availability(opts)`, `schedule(opts)`, `list(opts?)`, `create(input, opts?)`, `get(id)`, `update(id, input, opts?)`, `cancel(id, input?, opts?)`, `reschedule(id, input, opts?)`, `markNoShow(id, opts?)` — all **staff** semantics (policy windows bypassed) |
 | `medal.bookings.manage` | `src/resources/bookings.ts` (`BookingsManage`) | `get(token)`, `cancel(token, input?, opts?)`, `reschedule(token, input, opts?)` — **customer** semantics (policy windows enforced) |
+| `medal.bookings.payment` | `src/resources/bookings.ts` (`BookingsPayment`) | `start(id, input, opts?)`, `get(id)` — Vipps payment on a booking, as the business |
+| `medal.bookings.manage.payment` | `src/resources/bookings.ts` (`BookingsManagePayment`) | `start(token, input, opts?)`, `get(token)` — the same two, on the customer's behalf |
 | `medal.bookings.persons` | `src/resources/bookings.ts` (`BookingsPersons`) | `list(contactId, { include_inactive? })`, `create(input)` — persons a contact books for (children, pets, employees) |
 | `medal.bookings.relations` | `src/resources/bookings.ts` (`BookingsRelations`) | `list(contactId)` → `{ outgoing, incoming }`, `create(input)` — directional relations between contacts |
 | `medal.bookings.events` | `src/resources/bookings.ts` (`BookingsEvents`) | `list({ from, to, status? })`, `get(id)`, `create(input)` — arrangementer (scheduled group sessions); registering a booking to an event ships in a later release |
@@ -378,6 +380,8 @@ The `with { type: "json" }` import-attribute syntax requires Node 24+ or a bundl
 | Hard-coded channel IDs in `posts.create` | Channels are workspace-specific | Call `posts.channels()` to discover them |
 | Looping on `next_cursor` alone for pagination | Can be non-null when `has_more: false` | Loop on `pagination.has_more` |
 | `medal.bookings.cancel(id)` to relay a customer's cancel | Bypasses the policy window and records `cancelled_by: 'staff'` | `medal.bookings.manage.cancel(token)` |
+| Trusting the browser's return redirect after `payment.start` | The customer can close the tab or edit the URL; the outcome comes through Medal | Poll `medal.bookings.payment.get(id)`, or read `Booking.payment_status` |
+| Caching `redirect_url` from `payment.start` | Show-once, and the payment expires in 10 minutes — a stale link leads nowhere | Start a new attempt |
 | Dividing `amount_ore` / `price_ore` into kroner for storage | Integer øre; a float rounds and the invoice is wrong | Keep the integer; format only at the point of display |
 | Reusing the old id or manage token after a reschedule | Reschedule inserts a NEW booking and mints a NEW token | Store `result.booking_id` and `result.manage_token` |
 | Expecting `manage_token` on an idempotent replay | Tokens are redacted from replayed responses | Persist it from the first response — a replay cannot give it back |

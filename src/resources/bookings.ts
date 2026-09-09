@@ -5,6 +5,8 @@ import type {
   BookingAvailabilityOptions,
   BookingCreateResult,
   BookingEvent,
+  BookingPayment,
+  BookingPaymentStart,
   BookingRescheduleResult,
   BookingResource,
   BookingScheduleDay,
@@ -25,9 +27,94 @@ import type {
   ListBookingsOptions,
   ManageSummary,
   RescheduleBookingInput,
+  StartBookingPaymentInput,
   UpdateBookingInput,
 } from "../types/bookings";
 import type { ApiResponse } from "../types/common";
+
+/**
+ * Payments on a booking addressed by BOOKING ID — the business starting or
+ * inspecting a payment for one of its own bookings.
+ *
+ * The outcome reaches your system through Medal, never through the browser: a
+ * customer can close the tab, hit back, or edit the return URL, so treat the
+ * return redirect as a hint to re-read and nothing more. Poll {@link get} on
+ * your return page, or read the booking's `payment_status`.
+ *
+ * @example
+ * ```ts
+ * const { data } = await medal.bookings.payment.start("bk_1", {
+ *   return_url: "https://example.no/retur",
+ *   terms_accepted: true,
+ * });
+ * // Hand data.redirect_url to the Vipps Widget SDK, unchanged.
+ * ```
+ */
+class BookingsPayment {
+  constructor(private client: BaseClient) {}
+
+  /**
+   * Reserve (or charge) the booking's amount and get the wallet redirect.
+   *
+   * Automatically idempotent: the SDK mints an `Idempotency-Key` so its own
+   * 5xx retries replay instead of reserving twice. One live payment per
+   * booking — starting a second while one is outstanding answers 409; wait for
+   * the first to be approved, aborted, or to expire (ten minutes).
+   *
+   * A `return_url` the workspace's own sites do not vouch for is refused with
+   * 422, not 400: the URL parses, it is just not yours.
+   */
+  async start(
+    id: string,
+    input: StartBookingPaymentInput,
+    options?: RequestOptions,
+  ): Promise<ApiResponse<BookingPaymentStart>> {
+    return this.client.postOnce(
+      `/api/v1/bookings/${encodeURIComponent(id)}/payment`,
+      input,
+      options,
+    );
+  }
+
+  /**
+   * The newest payment attempt on the booking.
+   *
+   * Throws `MedalApiError` with status 404 when the booking has no payment at
+   * all — "not started" and "unknown booking" answer alike, so this is not an
+   * existence oracle. Earlier attempts are not returned; attempt N+1 is what
+   * "the payment" means to a caller polling a retry.
+   */
+  async get(id: string): Promise<ApiResponse<BookingPayment>> {
+    return this.client.get(`/api/v1/bookings/${encodeURIComponent(id)}/payment`);
+  }
+}
+
+/**
+ * The same two payment operations, authorized by the customer's manage token
+ * instead of by booking id — for relaying a click on their own confirmation
+ * link. Identical wire shapes; only the credential differs.
+ */
+class BookingsManagePayment {
+  constructor(private client: BaseClient) {}
+
+  /** Start a payment on the customer's behalf. See {@link BookingsPayment.start}. */
+  async start(
+    token: string,
+    input: StartBookingPaymentInput,
+    options?: RequestOptions,
+  ): Promise<ApiResponse<BookingPaymentStart>> {
+    return this.client.postOnce(
+      `/api/v1/bookings/manage/${encodeURIComponent(token)}/payment`,
+      input,
+      options,
+    );
+  }
+
+  /** Read the payment on the customer's own booking. 404 when there is none. */
+  async get(token: string): Promise<ApiResponse<BookingPayment>> {
+    return this.client.get(`/api/v1/bookings/manage/${encodeURIComponent(token)}/payment`);
+  }
+}
 
 /**
  * Customer-side booking management, addressed by the show-once manage token
@@ -42,7 +129,12 @@ import type { ApiResponse } from "../types/common";
  * id-addressed methods.
  */
 class BookingsManage {
-  constructor(private client: BaseClient) {}
+  /** Payments authorized by the manage token rather than by booking id. */
+  readonly payment: BookingsManagePayment;
+
+  constructor(private client: BaseClient) {
+    this.payment = new BookingsManagePayment(client);
+  }
 
   /**
    * Read what the holder of a manage token may see and do. Honour
@@ -193,12 +285,15 @@ export class Bookings {
   readonly relations: BookingsRelations;
   /** Arrangementer — scheduled group sessions bookings register against. */
   readonly events: BookingsEvents;
+  /** Vipps payments on a booking, as the business. */
+  readonly payment: BookingsPayment;
 
   constructor(private client: BaseClient) {
     this.manage = new BookingsManage(client);
     this.persons = new BookingsPersons(client);
     this.relations = new BookingsRelations(client);
     this.events = new BookingsEvents(client);
+    this.payment = new BookingsPayment(client);
   }
 
   /** List the bookable service catalogue. Active-only unless asked otherwise. */
