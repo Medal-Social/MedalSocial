@@ -1,5 +1,23 @@
 # @medalsocial/sdk
 
+## 1.9.0
+
+### Minor Changes
+
+- [#132](https://github.com/Medal-Social/MedalSocial-SDK/pull/132) [`e195985`](https://github.com/Medal-Social/MedalSocial-SDK/commit/e19598510110d31d70d9c3c84ec03befb6c7cfd4) Thanks [@alioftech](https://github.com/alioftech)! - bookings: `persons`, `relations` and `events` resources; `booked_for_person_id` on booking items and rows.
+  
+  portal: `persons` and `labels` on the profile.
+
+## 1.8.0
+
+### Minor Changes
+
+- [#127](https://github.com/Medal-Social/MedalSocial-SDK/pull/127) [`1224467`](https://github.com/Medal-Social/MedalSocial-SDK/commit/12244678b9e07b688f7fdc9f40f18519bcb083c9) Thanks [@alioftech](https://github.com/alioftech)! - Add `medal.portal.*` for customer-portal sessions: e-mail code login (`login.start`/`login.verify`), `me`/`updateMe`, `myBookings`, `exportMyData`, `deleteMe`, `logout`. Session-bound calls send the `X-Portal-Session` header; `RequestOptions.headers` is now supported on every verb.
+
+### Patch Changes
+
+- [#130](https://github.com/Medal-Social/MedalSocial-SDK/pull/130) [`f7aad5b`](https://github.com/Medal-Social/MedalSocial-SDK/commit/f7aad5b5315a35b99ebef2b88ffafca8c3dd4ef2) Thanks [@alioftech](https://github.com/alioftech)! - `retry: false` is now honoured by `patch` and `delete` as well as `post` (it was silently ignored on those verbs), and `medal.portal.updateMe` is sent exactly once because a `marketing_consent` change records a consent event that a retry would repeat.
+
 ## 1.7.0
 
 ### Minor Changes
