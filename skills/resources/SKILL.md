@@ -38,6 +38,9 @@ Errors throw `MedalApiError` (see the `client` skill for details).
 |---|---|---|
 | `medal.bookings` | `src/resources/bookings.ts` | `listServices(opts?)`, `listResources()`, `availability(opts)`, `schedule(opts)`, `list(opts?)`, `create(input, opts?)`, `get(id)`, `update(id, input, opts?)`, `cancel(id, input?, opts?)`, `reschedule(id, input, opts?)`, `markNoShow(id, opts?)` — all **staff** semantics (policy windows bypassed) |
 | `medal.bookings.manage` | `src/resources/bookings.ts` (`BookingsManage`) | `get(token)`, `cancel(token, input?, opts?)`, `reschedule(token, input, opts?)` — **customer** semantics (policy windows enforced) |
+| `medal.bookings.persons` | `src/resources/bookings.ts` (`BookingsPersons`) | `list(contactId, { include_inactive? })`, `create(input)` — persons a contact books for (children, pets, employees) |
+| `medal.bookings.relations` | `src/resources/bookings.ts` (`BookingsRelations`) | `list(contactId)` → `{ outgoing, incoming }`, `create(input)` — directional relations between contacts |
+| `medal.bookings.events` | `src/resources/bookings.ts` (`BookingsEvents`) | `list({ from, to, status? })`, `get(id)`, `create(input)` — arrangementer (scheduled group sessions); registering a booking to an event ships in a later release |
 | `medal.contacts` | `src/resources/contacts.ts` | `list(opts?)`, `create(input)`, `get(id)`, `update(id, input)`, `remove(id)`, `activities(id, opts?)`, `addNote(id, { content })`, `import(contacts[])` |
 | `medal.deals` | `src/resources/deals.ts` | `list(opts?)`, `create(input)`, `get(id)`, `update(id, input)`, `remove(id)` |
 | `medal.emails.templates` | `src/resources/emails.ts` (`EmailTemplates`) | `list()`, `get(slug, opts?)` |
