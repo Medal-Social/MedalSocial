@@ -268,7 +268,7 @@ if (summary.can_reschedule) {
 
 `can_cancel` / `can_reschedule` already apply the policy windows — honour them rather than re-deriving from `cancel_window_hours`.
 
-**Booking writes are idempotent by default.** The SDK retries 429/5xx automatically, so every booking `POST` (`create`, `cancel`, `reschedule`, `markNoShow`, and both `manage` writes) carries a generated `Idempotency-Key` — a retry after a gateway failure replays the original result instead of booking the slot twice. Supply your own `options.idempotencyKey` to extend that guarantee across *your* retries too: the server remembers a key for 24 hours, keyed by `(key, workspace, method + path)`.
+**Booking writes are idempotent by default.** The SDK retries 429/5xx automatically, so every booking `POST` (`create`, `cancel`, `reschedule`, `markNoShow`, `payment.start`, and the `manage` writes) carries a generated `Idempotency-Key` — a retry after a gateway failure replays the original result instead of booking the slot twice. Supply your own `options.idempotencyKey` to extend that guarantee across *your* retries too: the server remembers a key for 24 hours, keyed by `(key, workspace, method + path)`.
 
 `update(id, input)` requires at least one of `notes` / `internal_notes`; `update(id, {})` is a compile error, matching the API's own 400.
 
@@ -294,6 +294,29 @@ const { data: events } = await medal.bookings.events.list({
   to: '2026-09-30',
 });
 ```
+
+#### Payments
+
+`medal.bookings.payment` takes a Vipps payment on a booking as the business; `medal.bookings.manage.payment` does the same on the customer's behalf, keyed by the manage token. `Booking.payment_mode` (and `ManageSummary.payment_mode`) says what the booking requires — `payment_status: 'none'` cannot tell "owes nothing" from "has not paid yet".
+
+```ts
+const { data: started } = await medal.bookings.payment.start(booking.id, {
+  return_url: 'https://example.no/retur',
+  terms_accepted: true,          // must be literally true — 400 otherwise
+  terms_version: '2026-09',
+});
+// Hand started.redirect_url to the Vipps Widget SDK UNCHANGED. It is SHOW-ONCE:
+// payment.get() never returns it, and the payment behind it expires in 10 minutes.
+
+const { data: payment } = await medal.bookings.payment.get(booking.id);
+payment.state;        // created | authorized | captured | cancelled | refunded | failed | expired
+payment.captured_ore; // integer øre — a Vipps payment stays AUTHORIZED after a capture,
+                      // so the aggregates, not `state`, say what actually moved
+```
+
+**Never trust the return redirect.** The customer can close the tab, hit back, or edit the URL — the outcome reaches you through Medal. Poll `payment.get(...)` on your return page, or read the booking's `payment_status`.
+
+The customer must accept your terms **before** a payment is initiated: `terms_accepted: true` is required by the type *and* by the API, and a request without it leaves no payment (and no consent record) behind. A `return_url` your workspace's own sites do not vouch for answers **422**, not 400 — the URL parses, it is just not yours. Starting a second payment while one is live answers **409**, and `payment.get(...)` on a booking with no payment yet answers **404**, exactly as an unknown booking does.
 
 ### Customer portal
 

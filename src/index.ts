@@ -225,6 +225,10 @@ export type {
   BookingEvent,
   BookingEventStatus,
   BookingEventTemplateKey,
+  BookingPayment,
+  BookingPaymentMode,
+  BookingPaymentStart,
+  BookingPaymentState,
   BookingPaymentStatus,
   BookingRescheduleResult,
   BookingResource,
@@ -254,6 +258,7 @@ export type {
   ManageSummary,
   RelationType,
   RescheduleBookingInput,
+  StartBookingPaymentInput,
   UpdateBookingInput,
 } from "./types/bookings";
 export type {
