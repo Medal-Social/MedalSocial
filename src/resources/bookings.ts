@@ -4,6 +4,7 @@ import type {
   BookingActionResult,
   BookingAvailabilityOptions,
   BookingCreateResult,
+  BookingEvent,
   BookingRescheduleResult,
   BookingResource,
   BookingScheduleDay,
@@ -12,7 +13,14 @@ import type {
   BookingSlot,
   BookingsPage,
   CancelBookingInput,
+  ContactPerson,
+  ContactRelations,
+  CreateBookingEventInput,
   CreateBookingInput,
+  CreateContactPersonInput,
+  CreateContactRelationInput,
+  CreateContactRelationResult,
+  ListBookingEventsOptions,
   ListBookingServicesOptions,
   ListBookingsOptions,
   ManageSummary,
@@ -76,6 +84,82 @@ class BookingsManage {
 }
 
 /**
+ * Persons a contact books for — children, pets, employees. Each has no login
+ * of its own; bookings made on their behalf still hang off the contact via
+ * `booked_for_person_id`.
+ */
+class BookingsPersons {
+  constructor(private client: BaseClient) {}
+
+  /** Persons a contact books for. Active-only unless `include_inactive`. */
+  async list(
+    contactId: string,
+    options?: { include_inactive?: boolean },
+  ): Promise<ApiResponse<ContactPerson[]>> {
+    const params: Record<string, string | undefined> = { contact_id: contactId };
+    if (options?.include_inactive !== undefined) {
+      params.include_inactive = String(options.include_inactive);
+    }
+    return this.client.get("/api/v1/bookings/persons", params);
+  }
+
+  /** Add a person under a contact. */
+  async create(
+    input: CreateContactPersonInput,
+    options?: RequestOptions,
+  ): Promise<ApiResponse<ContactPerson>> {
+    return this.client.postOnce("/api/v1/bookings/persons", input, options);
+  }
+}
+
+/** Directional relations between contacts — guardian, partner, employer, and so on. */
+class BookingsRelations {
+  constructor(private client: BaseClient) {}
+
+  /** Relations a contact holds, split into outgoing and incoming. */
+  async list(contactId: string): Promise<ApiResponse<ContactRelations>> {
+    return this.client.get("/api/v1/bookings/relations", { contact_id: contactId });
+  }
+
+  /** Create a relation from one contact to another. */
+  async create(
+    input: CreateContactRelationInput,
+    options?: RequestOptions,
+  ): Promise<ApiResponse<CreateContactRelationResult>> {
+    return this.client.postOnce("/api/v1/bookings/relations", input, options);
+  }
+}
+
+/**
+ * Arrangementer — scheduled group sessions bookings register against.
+ * Registration itself lands in a later release; this is the read/create
+ * surface for the events.
+ */
+class BookingsEvents {
+  constructor(private client: BaseClient) {}
+
+  /** Arrangementer in a date range (`yyyy-mm-dd`, inclusive). */
+  async list(options: ListBookingEventsOptions): Promise<ApiResponse<BookingEvent[]>> {
+    const params: Record<string, string | undefined> = { from: options.from, to: options.to };
+    if (options.status) params.status = options.status;
+    return this.client.get("/api/v1/bookings/events", params);
+  }
+
+  /** Get an arrangement by ID. */
+  async get(id: string): Promise<ApiResponse<BookingEvent>> {
+    return this.client.get(`/api/v1/bookings/events/${encodeURIComponent(id)}`);
+  }
+
+  /** Create an arrangement from a template. */
+  async create(
+    input: CreateBookingEventInput,
+    options?: RequestOptions,
+  ): Promise<ApiResponse<BookingEvent>> {
+    return this.client.postOnce("/api/v1/bookings/events", input, options);
+  }
+}
+
+/**
  * Appointment bookings: the service catalogue, free slots, and the bookings
  * themselves.
  *
@@ -103,9 +187,18 @@ class BookingsManage {
 export class Bookings {
   /** Customer-side actions addressed by manage token. */
   readonly manage: BookingsManage;
+  /** Persons a contact books for — children, pets, employees. */
+  readonly persons: BookingsPersons;
+  /** Directional relations between contacts. */
+  readonly relations: BookingsRelations;
+  /** Arrangementer — scheduled group sessions bookings register against. */
+  readonly events: BookingsEvents;
 
   constructor(private client: BaseClient) {
     this.manage = new BookingsManage(client);
+    this.persons = new BookingsPersons(client);
+    this.relations = new BookingsRelations(client);
+    this.events = new BookingsEvents(client);
   }
 
   /** List the bookable service catalogue. Active-only unless asked otherwise. */

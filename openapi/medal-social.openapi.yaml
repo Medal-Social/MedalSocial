@@ -732,6 +732,160 @@ paths:
                 $ref: "#/components/schemas/ApiResponse_BookingScheduleDayArray"
         default:
           $ref: "#/components/responses/ApiError"
+  /api/v1/bookings/persons:
+    get:
+      tags: [Bookings]
+      operationId: listContactPersons
+      summary: List a contact's persons
+      description: >-
+        Persons a contact books for — a child, a pet, an employee. No login of
+        their own. Active-only unless `include_inactive` is set.
+      parameters:
+        - name: contact_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: include_inactive
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Contact persons.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse_ContactPersonArray"
+        default:
+          $ref: "#/components/responses/ApiError"
+    post:
+      tags: [Bookings]
+      operationId: createContactPerson
+      summary: Add a person under a contact
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateContactPersonInput"
+      responses:
+        "201":
+          description: Created person.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse_ContactPerson"
+        default:
+          $ref: "#/components/responses/ApiError"
+  /api/v1/bookings/relations:
+    get:
+      tags: [Bookings]
+      operationId: listContactRelations
+      summary: List a contact's relations
+      description: Directional relations a contact holds, split into outgoing and incoming.
+      parameters:
+        - name: contact_id
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Outgoing and incoming relations.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse_ContactRelations"
+        default:
+          $ref: "#/components/responses/ApiError"
+    post:
+      tags: [Bookings]
+      operationId: createContactRelation
+      summary: Create a relation from one contact to another
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateContactRelationInput"
+      responses:
+        "201":
+          description: Created relation id.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse_CreateContactRelationResult"
+        default:
+          $ref: "#/components/responses/ApiError"
+  /api/v1/bookings/events:
+    get:
+      tags: [Bookings]
+      operationId: listBookingEvents
+      summary: List arrangementer in a date range
+      parameters:
+        - name: from
+          in: query
+          required: true
+          description: Start of the window, `yyyy-mm-dd`, inclusive.
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          required: true
+          description: End of the window, `yyyy-mm-dd`, inclusive.
+          schema:
+            type: string
+            format: date
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/BookingEventStatus"
+      responses:
+        "200":
+          description: Arrangementer in the window.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse_BookingEventArray"
+        default:
+          $ref: "#/components/responses/ApiError"
+    post:
+      tags: [Bookings]
+      operationId: createBookingEvent
+      summary: Create an arrangement from a template
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBookingEventInput"
+      responses:
+        "201":
+          description: Created arrangement.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse_BookingEvent"
+        default:
+          $ref: "#/components/responses/ApiError"
+  /api/v1/bookings/events/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Bookings]
+      operationId: getBookingEvent
+      summary: Get an arrangement
+      responses:
+        "200":
+          description: Arrangement.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse_BookingEvent"
+        default:
+          $ref: "#/components/responses/ApiError"
   /api/v1/bookings/{id}:
     parameters:
       - $ref: "#/components/parameters/Id"
@@ -2644,6 +2798,9 @@ components:
         - end_ts
         - booked_for_name
         - booked_for_birth_year
+        - booked_for_person_id
+        - event_id
+        - event_order
         - party_sequence_id
         - status
         - cancelled_by
@@ -2675,6 +2832,15 @@ components:
           type: [string, "null"]
         booked_for_birth_year:
           description: A birth year, not a birthdate — the age bracket is all that is stored.
+          type: [integer, "null"]
+        booked_for_person_id:
+          description: The ContactPerson this booking was made for, if any.
+          type: [string, "null"]
+        event_id:
+          description: The BookingEvent this booking is a registration for, if any.
+          type: [string, "null"]
+        event_order:
+          description: Position of this booking within its event's registrations, if any.
           type: [integer, "null"]
         party_sequence_id:
           description: Shared by every booking created in the same party request.
@@ -2880,6 +3046,9 @@ components:
           type: integer
           minimum: 1900
           maximum: 2200
+        booked_for_person_id:
+          description: Book this line on behalf of a ContactPerson rather than the contact.
+          type: string
     CreateBookingInput:
       type: object
       required: [items, contact]
@@ -4743,3 +4912,284 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/ChannelConnectionDisconnectResult"
+    RelationType:
+      description: How a person or a relation relates to a contact.
+      type: string
+      enum: [guardian, owner, employer, caregiver, partner, custom]
+    ContactPerson:
+      description: >-
+        A person a contact books for — a child, a pet, an employee. No login
+        of their own.
+      type: object
+      required:
+        - person_id
+        - contact_id
+        - name
+        - birth_year
+        - relation_type
+        - relation_label
+        - notes
+        - active
+        - promoted_to_contact_id
+        - created_at
+      properties:
+        person_id:
+          type: string
+        contact_id:
+          type: string
+        name:
+          type: string
+        birth_year:
+          type: [integer, "null"]
+        relation_type:
+          $ref: "#/components/schemas/RelationType"
+        relation_label:
+          type: [string, "null"]
+        notes:
+          type: [string, "null"]
+        active:
+          type: boolean
+        promoted_to_contact_id:
+          type: [string, "null"]
+        created_at:
+          type: integer
+          description: Unix timestamp in milliseconds.
+    CreateContactPersonInput:
+      type: object
+      required: [contact_id, name, relation_type]
+      properties:
+        contact_id:
+          type: string
+        name:
+          type: string
+        birth_year:
+          type: integer
+        relation_type:
+          $ref: "#/components/schemas/RelationType"
+        relation_label:
+          type: string
+        notes:
+          type: string
+    ContactRelation:
+      description: One directional relation between two contacts.
+      type: object
+      required:
+        - relation_id
+        - from_contact_id
+        - to_contact_id
+        - type
+        - custom_label
+        - since
+        - note
+        - counterpart_name
+        - created_at
+      properties:
+        relation_id:
+          type: string
+        from_contact_id:
+          type: string
+        to_contact_id:
+          type: string
+        type:
+          $ref: "#/components/schemas/RelationType"
+        custom_label:
+          type: [string, "null"]
+        since:
+          type: [integer, "null"]
+          description: Unix timestamp in milliseconds.
+        note:
+          type: [string, "null"]
+        counterpart_name:
+          type: [string, "null"]
+        created_at:
+          type: integer
+          description: Unix timestamp in milliseconds.
+    ContactRelations:
+      description: Relations a contact holds, split by direction.
+      type: object
+      required: [outgoing, incoming]
+      properties:
+        outgoing:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContactRelation"
+        incoming:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContactRelation"
+    CreateContactRelationInput:
+      type: object
+      required: [from_contact_id, to_contact_id, type]
+      properties:
+        from_contact_id:
+          type: string
+        to_contact_id:
+          type: string
+        type:
+          $ref: "#/components/schemas/RelationType"
+        custom_label:
+          type: string
+        since:
+          type: integer
+          description: Unix timestamp in milliseconds.
+        note:
+          type: string
+    CreateContactRelationResult:
+      type: object
+      required: [relation_id]
+      properties:
+        relation_id:
+          type: string
+    BookingEventStatus:
+      type: string
+      enum: [draft, open, closed, completed, cancelled]
+    BookingEventTemplateKey:
+      type: string
+      enum: [kindergarten_visit, company_day, class, open_day, custom]
+    BookingEvent:
+      description: An arrangement — a scheduled group session bookings register against.
+      type: object
+      required:
+        - event_id
+        - template_id
+        - host_id
+        - date
+        - window_start_minute
+        - window_end_minute
+        - place
+        - capacity
+        - minimum
+        - registered_count
+        - service_ids
+        - resource_ids
+        - price_override_ore
+        - status
+        - registration_closes_at
+        - slug
+        - created_at
+      properties:
+        event_id:
+          type: string
+        template_id:
+          type: string
+        host_id:
+          type: [string, "null"]
+        date:
+          description: yyyy-mm-dd in the workspace time zone.
+          type: string
+          format: date
+        window_start_minute:
+          type: integer
+        window_end_minute:
+          type: integer
+        place:
+          type: string
+          enum: [at_host, in_house]
+        capacity:
+          type: integer
+        minimum:
+          type: integer
+        registered_count:
+          type: integer
+        service_ids:
+          type: array
+          items:
+            type: string
+        resource_ids:
+          type: array
+          items:
+            type: string
+        price_override_ore:
+          type: [integer, "null"]
+        status:
+          $ref: "#/components/schemas/BookingEventStatus"
+        registration_closes_at:
+          type: integer
+          description: Unix timestamp in milliseconds.
+        slug:
+          type: string
+        created_at:
+          type: integer
+          description: Unix timestamp in milliseconds.
+    CreateBookingEventInput:
+      type: object
+      required: [template_key, date, window_start_minute, place, service_ids, resource_ids]
+      properties:
+        template_key:
+          $ref: "#/components/schemas/BookingEventTemplateKey"
+        host_id:
+          type: string
+        date:
+          type: string
+          format: date
+        window_start_minute:
+          type: integer
+        window_end_minute:
+          type: integer
+        place:
+          type: string
+          enum: [at_host, in_house]
+        capacity:
+          type: integer
+        minimum:
+          type: integer
+        service_ids:
+          type: array
+          items:
+            type: string
+        resource_ids:
+          type: array
+          items:
+            type: string
+    ApiResponse_ContactPersonArray:
+      $ref: "#/components/schemas/Envelope_ContactPersonArray"
+    ApiResponse_ContactPerson:
+      $ref: "#/components/schemas/Envelope_ContactPerson"
+    ApiResponse_ContactRelations:
+      $ref: "#/components/schemas/Envelope_ContactRelations"
+    ApiResponse_CreateContactRelationResult:
+      $ref: "#/components/schemas/Envelope_CreateContactRelationResult"
+    ApiResponse_BookingEventArray:
+      $ref: "#/components/schemas/Envelope_BookingEventArray"
+    ApiResponse_BookingEvent:
+      $ref: "#/components/schemas/Envelope_BookingEvent"
+    Envelope_ContactPersonArray:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContactPerson"
+    Envelope_ContactPerson:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/ContactPerson"
+    Envelope_ContactRelations:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/ContactRelations"
+    Envelope_CreateContactRelationResult:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/CreateContactRelationResult"
+    Envelope_BookingEventArray:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/BookingEvent"
+    Envelope_BookingEvent:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/BookingEvent"

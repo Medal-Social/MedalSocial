@@ -415,6 +415,85 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/bookings/persons": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List a contact's persons
+     * @description Persons a contact books for — a child, a pet, an employee. No login of their own. Active-only unless `include_inactive` is set.
+     */
+    get: operations["listContactPersons"];
+    put?: never;
+    /** Add a person under a contact */
+    post: operations["createContactPerson"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/bookings/relations": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List a contact's relations
+     * @description Directional relations a contact holds, split into outgoing and incoming.
+     */
+    get: operations["listContactRelations"];
+    put?: never;
+    /** Create a relation from one contact to another */
+    post: operations["createContactRelation"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/bookings/events": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List arrangementer in a date range */
+    get: operations["listBookingEvents"];
+    put?: never;
+    /** Create an arrangement from a template */
+    post: operations["createBookingEvent"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/bookings/events/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["parameters"]["Id"];
+      };
+      cookie?: never;
+    };
+    /** Get an arrangement */
+    get: operations["getBookingEvent"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/bookings/{id}": {
     parameters: {
       query?: never;
@@ -1612,6 +1691,12 @@ export interface components {
       booked_for_name: string | null;
       /** @description A birth year, not a birthdate — the age bracket is all that is stored. */
       booked_for_birth_year: number | null;
+      /** @description The ContactPerson this booking was made for, if any. */
+      booked_for_person_id: string | null;
+      /** @description The BookingEvent this booking is a registration for, if any. */
+      event_id: string | null;
+      /** @description Position of this booking within its event's registrations, if any. */
+      event_order: number | null;
       /** @description Shared by every booking created in the same party request. */
       party_sequence_id: string | null;
       status: components["schemas"]["BookingStatus"];
@@ -1707,6 +1792,8 @@ export interface components {
       start_ts: components["schemas"]["BookingTimestampInput"];
       booked_for_name?: string;
       booked_for_birth_year?: number;
+      /** @description Book this line on behalf of a ContactPerson rather than the contact. */
+      booked_for_person_id?: string;
     };
     CreateBookingInput: {
       /** @description A PARTY — one request books a whole family in one all-or-nothing transaction. */
@@ -2567,6 +2654,133 @@ export interface components {
     Envelope_ChannelConnectionDisconnectResult: {
       data: components["schemas"]["ChannelConnectionDisconnectResult"];
     };
+    /**
+     * @description How a person or a relation relates to a contact.
+     * @enum {string}
+     */
+    RelationType: "guardian" | "owner" | "employer" | "caregiver" | "partner" | "custom";
+    /** @description A person a contact books for — a child, a pet, an employee. No login of their own. */
+    ContactPerson: {
+      person_id: string;
+      contact_id: string;
+      name: string;
+      birth_year: number | null;
+      relation_type: components["schemas"]["RelationType"];
+      relation_label: string | null;
+      notes: string | null;
+      active: boolean;
+      promoted_to_contact_id: string | null;
+      /** @description Unix timestamp in milliseconds. */
+      created_at: number;
+    };
+    CreateContactPersonInput: {
+      contact_id: string;
+      name: string;
+      birth_year?: number;
+      relation_type: components["schemas"]["RelationType"];
+      relation_label?: string;
+      notes?: string;
+    };
+    /** @description One directional relation between two contacts. */
+    ContactRelation: {
+      relation_id: string;
+      from_contact_id: string;
+      to_contact_id: string;
+      type: components["schemas"]["RelationType"];
+      custom_label: string | null;
+      /** @description Unix timestamp in milliseconds. */
+      since: number | null;
+      note: string | null;
+      counterpart_name: string | null;
+      /** @description Unix timestamp in milliseconds. */
+      created_at: number;
+    };
+    /** @description Relations a contact holds, split by direction. */
+    ContactRelations: {
+      outgoing: components["schemas"]["ContactRelation"][];
+      incoming: components["schemas"]["ContactRelation"][];
+    };
+    CreateContactRelationInput: {
+      from_contact_id: string;
+      to_contact_id: string;
+      type: components["schemas"]["RelationType"];
+      custom_label?: string;
+      /** @description Unix timestamp in milliseconds. */
+      since?: number;
+      note?: string;
+    };
+    CreateContactRelationResult: {
+      relation_id: string;
+    };
+    /** @enum {string} */
+    BookingEventStatus: "draft" | "open" | "closed" | "completed" | "cancelled";
+    /** @enum {string} */
+    BookingEventTemplateKey: "kindergarten_visit" | "company_day" | "class" | "open_day" | "custom";
+    /** @description An arrangement — a scheduled group session bookings register against. */
+    BookingEvent: {
+      event_id: string;
+      template_id: string;
+      host_id: string | null;
+      /**
+       * Format: date
+       * @description yyyy-mm-dd in the workspace time zone.
+       */
+      date: string;
+      window_start_minute: number;
+      window_end_minute: number;
+      /** @enum {string} */
+      place: "at_host" | "in_house";
+      capacity: number;
+      minimum: number;
+      registered_count: number;
+      service_ids: string[];
+      resource_ids: string[];
+      price_override_ore: number | null;
+      status: components["schemas"]["BookingEventStatus"];
+      /** @description Unix timestamp in milliseconds. */
+      registration_closes_at: number;
+      slug: string;
+      /** @description Unix timestamp in milliseconds. */
+      created_at: number;
+    };
+    CreateBookingEventInput: {
+      template_key: components["schemas"]["BookingEventTemplateKey"];
+      host_id?: string;
+      /** Format: date */
+      date: string;
+      window_start_minute: number;
+      window_end_minute?: number;
+      /** @enum {string} */
+      place: "at_host" | "in_house";
+      capacity?: number;
+      minimum?: number;
+      service_ids: string[];
+      resource_ids: string[];
+    };
+    ApiResponse_ContactPersonArray: components["schemas"]["Envelope_ContactPersonArray"];
+    ApiResponse_ContactPerson: components["schemas"]["Envelope_ContactPerson"];
+    ApiResponse_ContactRelations: components["schemas"]["Envelope_ContactRelations"];
+    ApiResponse_CreateContactRelationResult: components["schemas"]["Envelope_CreateContactRelationResult"];
+    ApiResponse_BookingEventArray: components["schemas"]["Envelope_BookingEventArray"];
+    ApiResponse_BookingEvent: components["schemas"]["Envelope_BookingEvent"];
+    Envelope_ContactPersonArray: {
+      data: components["schemas"]["ContactPerson"][];
+    };
+    Envelope_ContactPerson: {
+      data: components["schemas"]["ContactPerson"];
+    };
+    Envelope_ContactRelations: {
+      data: components["schemas"]["ContactRelations"];
+    };
+    Envelope_CreateContactRelationResult: {
+      data: components["schemas"]["CreateContactRelationResult"];
+    };
+    Envelope_BookingEventArray: {
+      data: components["schemas"]["BookingEvent"][];
+    };
+    Envelope_BookingEvent: {
+      data: components["schemas"]["BookingEvent"];
+    };
   };
   responses: {
     /** @description API error. */
@@ -3394,6 +3608,178 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["ApiResponse_BookingScheduleDayArray"];
+        };
+      };
+      default: components["responses"]["ApiError"];
+    };
+  };
+  listContactPersons: {
+    parameters: {
+      query: {
+        contact_id: string;
+        include_inactive?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Contact persons. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponse_ContactPersonArray"];
+        };
+      };
+      default: components["responses"]["ApiError"];
+    };
+  };
+  createContactPerson: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CreateContactPersonInput"];
+      };
+    };
+    responses: {
+      /** @description Created person. */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponse_ContactPerson"];
+        };
+      };
+      default: components["responses"]["ApiError"];
+    };
+  };
+  listContactRelations: {
+    parameters: {
+      query: {
+        contact_id: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Outgoing and incoming relations. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponse_ContactRelations"];
+        };
+      };
+      default: components["responses"]["ApiError"];
+    };
+  };
+  createContactRelation: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CreateContactRelationInput"];
+      };
+    };
+    responses: {
+      /** @description Created relation id. */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponse_CreateContactRelationResult"];
+        };
+      };
+      default: components["responses"]["ApiError"];
+    };
+  };
+  listBookingEvents: {
+    parameters: {
+      query: {
+        /** @description Start of the window, `yyyy-mm-dd`, inclusive. */
+        from: string;
+        /** @description End of the window, `yyyy-mm-dd`, inclusive. */
+        to: string;
+        status?: components["schemas"]["BookingEventStatus"];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Arrangementer in the window. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponse_BookingEventArray"];
+        };
+      };
+      default: components["responses"]["ApiError"];
+    };
+  };
+  createBookingEvent: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CreateBookingEventInput"];
+      };
+    };
+    responses: {
+      /** @description Created arrangement. */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponse_BookingEvent"];
+        };
+      };
+      default: components["responses"]["ApiError"];
+    };
+  };
+  getBookingEvent: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["parameters"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Arrangement. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponse_BookingEvent"];
         };
       };
       default: components["responses"]["ApiError"];
