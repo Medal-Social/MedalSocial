@@ -1,5 +1,13 @@
 # @medalsocial/sdk
 
+## 1.9.0
+
+### Minor Changes
+
+- [#132](https://github.com/Medal-Social/MedalSocial-SDK/pull/132) [`e195985`](https://github.com/Medal-Social/MedalSocial-SDK/commit/e19598510110d31d70d9c3c84ec03befb6c7cfd4) Thanks [@alioftech](https://github.com/alioftech)! - bookings: `persons`, `relations` and `events` resources; `booked_for_person_id` on booking items and rows.
+  
+  portal: `persons` and `labels` on the profile.
+
 ## 1.8.0
 
 ### Minor Changes
