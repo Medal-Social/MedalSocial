@@ -308,13 +308,20 @@ export class BaseClient {
 
       if (!res.ok) {
         const body = parsed as
-          | { error?: { code?: string; message?: string; details?: unknown } }
+          | { error?: string | { code?: string; message?: string; details?: unknown } }
           | undefined;
+        // `/api/v1/` answers `{ error: { code, message } }`. The routes that
+        // predate it — `/api/cookie-consent` and friends — answer
+        // `{ success: false, error: "why" }` with a plain string. Reading only
+        // the object form turned every one of those into "HTTP 403: Error",
+        // so the caller could not tell an unowned domain from a bad key.
+        const detail = typeof body?.error === "string" ? body.error : undefined;
+        const structured = typeof body?.error === "object" ? body.error : undefined;
         throw new MedalApiError(
           res.status,
-          body?.error?.code ?? "UNKNOWN_ERROR",
-          body?.error?.message ?? `HTTP ${res.status}: ${res.statusText}`,
-          body?.error?.details,
+          structured?.code ?? "UNKNOWN_ERROR",
+          detail ?? structured?.message ?? `HTTP ${res.status}: ${res.statusText}`,
+          structured?.details,
         );
       }
 

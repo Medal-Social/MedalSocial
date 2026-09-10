@@ -1385,22 +1385,22 @@ describe("gdpr", () => {
     expect(data).toHaveLength(1);
   });
 
-  it("sends cookie consent to legacy endpoint", async () => {
+  // The full wire-shape contract lives in tests/gdpr-cookie-consent.test.ts,
+  // against a fixture replayed through the endpoint's own validator.
+  it("sends cookie consent to the API-key endpoint", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
       expect(url).toContain("/api/cookie-consent");
       const body = JSON.parse(init?.body as string);
       expect(body.domain).toBe("example.com");
+      expect(body.event).toBe("preferences_saved");
       return mockJson({ success: true, logId: "log_1" });
     });
     const medal = new Medal("medal_test", { baseUrl: BASE });
     const result = await medal.gdpr.cookieConsent({
+      event: "preferences_saved",
+      consentId: "CID-00001234",
       domain: "example.com",
-      consentStatus: "granted",
-      consentTimestamp: "2025-06-04T10:30:00Z",
-      cookiePreferences: {
-        necessary: { allowed: true },
-        analytics: { allowed: true },
-      },
+      categories: { essential: true, analytics: true },
     });
     expect(result.success).toBe(true);
   });

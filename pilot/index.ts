@@ -25,18 +25,35 @@ const AddContactNoteSchema = z.object({
   content: z.string(),
 });
 
+// Bounds mirror the endpoint's own schema, so an over-long value fails here
+// rather than costing a round trip to be told the same thing.
 const CookieConsentSchema = z.object({
-  domain: z.string(),
-  consentStatus: z.enum(["granted", "denied", "partial"]),
-  consentTimestamp: z.string(),
-  ipAddress: z.string().optional(),
-  userAgent: z.string().optional(),
-  cookiePreferences: z.object({
-    necessary: z.object({ allowed: z.boolean() }).optional(),
-    analytics: z.object({ allowed: z.boolean() }).optional(),
-    marketing: z.object({ allowed: z.boolean() }).optional(),
-    functional: z.object({ allowed: z.boolean() }).optional(),
-  }),
+  event: z.enum([
+    "preferences_saved",
+    "preferences_revoked",
+    "banner_displayed",
+    "preferences_expired",
+  ]),
+  consentId: z.string().min(1).max(128),
+  domain: z.string().min(1).max(253),
+  // `.strict()` mirrors the endpoint, which REJECTS an unknown category rather
+  // than dropping it. A non-strict object would let a misspelled category be
+  // stripped here and the event recorded without that decision — a consent
+  // record that silently disagrees with what the caller asked for.
+  categories: z
+    .object({
+      essential: z.boolean().optional(),
+      analytics: z.boolean().optional(),
+      marketing: z.boolean().optional(),
+      functional: z.boolean().optional(),
+    })
+    .strict(),
+  visitorId: z.string().max(128).optional(),
+  ipAddress: z.string().max(64).optional(),
+  userAgent: z.string().max(512).optional(),
+  consentText: z.string().max(2000).optional(),
+  policyVersion: z.string().max(64).optional(),
+  timestamp: z.number().optional(),
 });
 
 const RecordConsentSchema = z.object({

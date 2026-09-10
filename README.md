@@ -401,16 +401,22 @@ const { data: exports } = await medal.gdpr.listExports();
 const { data: status } = await medal.gdpr.getExport(exp.request_id);
 console.log(status.download_url); // available when status is 'completed'
 
-// Cookie consent (website integration)
+// Cookie consent (server-to-server, from your own backend).
+// `domain` must be one your workspace's registered sites vouch for, or the
+// call is refused with 403. Never call this from a browser — it uses your
+// workspace API key. Browser-side consent goes to /api/cookie-consent/public
+// with the site's public `pk_consent_*` key instead.
 await medal.gdpr.cookieConsent({
+  event: 'preferences_saved',
+  consentId: 'CID-00001234',
   domain: 'example.com',
-  consentStatus: 'granted',
-  consentTimestamp: new Date().toISOString(),
-  cookiePreferences: {
-    necessary: { allowed: true },
-    analytics: { allowed: true },
-    marketing: { allowed: false },
+  categories: {
+    essential: true,
+    analytics: true,
+    marketing: false,
+    functional: true,
   },
+  policyVersion: '2.1',
 });
 ```
 

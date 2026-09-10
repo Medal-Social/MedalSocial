@@ -979,7 +979,10 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Record cookie consent */
+    /**
+     * Record cookie consent
+     * @description Server-to-server ingestion of a cookie consent event, authenticated with a workspace API key — never call it from a browser. Rate limited to 600/min per API key.
+     */
     post: operations["recordCookieConsent"];
     delete?: never;
     options?: never;
@@ -2090,24 +2093,43 @@ export interface components {
     ConsentResult: {
       id: string;
     };
+    /**
+     * @description What happened to the visitor's preferences. The endpoint records events, not a current state.
+     * @enum {string}
+     */
+    CookieConsentEvent:
+      | "preferences_saved"
+      | "preferences_revoked"
+      | "banner_displayed"
+      | "preferences_expired";
+    /** @description The visitor's decision per category. An allowlist — an unknown category is rejected rather than silently dropped. */
+    CookieConsentCategories: {
+      /** @description Cookies the site cannot run without. Optional — the endpoint defaults it to true when omitted. */
+      essential?: boolean;
+      analytics?: boolean;
+      marketing?: boolean;
+      functional?: boolean;
+    };
+    /** @description A cookie consent event from an external site. The domain must be vouched for by one of the workspace's registered sites — its host, the apex of a `www.` registration, or a subdomain of either — otherwise the request is refused with 403. */
     CookieConsentInput: {
+      event: components["schemas"]["CookieConsentEvent"];
+      /** @description Caller's identifier for this consent record. */
+      consentId: string;
+      /** @description Hostname the consent was given on. */
       domain: string;
-      consentStatus: string;
-      /** Format: date-time */
-      consentTimestamp: string;
+      categories: components["schemas"]["CookieConsentCategories"];
+      visitorId?: string;
+      /** @description Optional. Only ever stored anonymized; omit it and the API reads its trusted edge headers instead. */
       ipAddress?: string;
       userAgent?: string;
-      cookiePreferences: {
-        [key: string]: components["schemas"]["CookieCategoryConsent"];
-      };
-    };
-    CookieCategoryConsent: {
-      allowed: boolean;
-      cookieRecords?: {
-        cookie: string;
-        duration: string;
-        description: string;
-      }[];
+      /** @description The exact legal text shown to the visitor. */
+      consentText?: string;
+      policyVersion?: string;
+      /**
+       * Format: int64
+       * @description Milliseconds since the epoch. Defaults to receipt time; accepted up to 5 minutes ahead and up to 7 days old.
+       */
+      timestamp?: number;
     };
     CookieConsentResult: {
       success: boolean;
