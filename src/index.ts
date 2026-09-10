@@ -337,7 +337,10 @@ export type {
   ConsentType,
   ContactConsents,
   CookieCategoryConsent,
+  CookieConsentCategories,
+  CookieConsentEvent,
   CookieConsentInput,
+  CookieConsentResult,
   GdprExport,
   RecordConsentInput,
 } from "./types/gdpr";

@@ -90,10 +90,10 @@ const UNKEYED_WRITES: { name: string; call: (medal: Medal) => Promise<unknown> }
     name: "gdpr.cookieConsent",
     call: (m) =>
       m.gdpr.cookieConsent({
+        event: "preferences_saved",
+        consentId: "CID-1",
         domain: "x.test",
-        consentStatus: "granted",
-        consentTimestamp: "2026-08-28T10:00:00Z",
-        cookiePreferences: { necessary: { allowed: true } },
+        categories: { essential: true },
       }),
   },
   { name: "webhooks.test", call: (m) => m.webhooks.test("wh_1") },

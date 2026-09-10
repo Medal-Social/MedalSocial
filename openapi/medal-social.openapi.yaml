@@ -1477,6 +1477,10 @@ paths:
       tags: [GDPR]
       operationId: recordCookieConsent
       summary: Record cookie consent
+      description: >-
+        Server-to-server ingestion of a cookie consent event, authenticated
+        with a workspace API key — never call it from a browser. Rate limited
+        to 600/min per API key.
       requestBody:
         required: true
         content:
@@ -3664,43 +3668,82 @@ components:
       properties:
         id:
           type: string
+    CookieConsentEvent:
+      type: string
+      enum:
+        - preferences_saved
+        - preferences_revoked
+        - banner_displayed
+        - preferences_expired
+      description: >-
+        What happened to the visitor's preferences. The endpoint records
+        events, not a current state.
+    CookieConsentCategories:
+      type: object
+      additionalProperties: false
+      description: >-
+        The visitor's decision per category. An allowlist — an unknown category
+        is rejected rather than silently dropped.
+      properties:
+        essential:
+          type: boolean
+          description: >-
+            Cookies the site cannot run without. Optional — the endpoint
+            defaults it to true when omitted.
+        analytics:
+          type: boolean
+        marketing:
+          type: boolean
+        functional:
+          type: boolean
     CookieConsentInput:
       type: object
-      required: [domain, consentStatus, consentTimestamp, cookiePreferences]
+      required: [event, consentId, domain, categories]
+      description: >-
+        A cookie consent event from an external site. The domain must be
+        vouched for by one of the workspace's registered sites — its host, the
+        apex of a `www.` registration, or a subdomain of either — otherwise the
+        request is refused with 403.
       properties:
+        event:
+          $ref: "#/components/schemas/CookieConsentEvent"
+        consentId:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: Caller's identifier for this consent record.
         domain:
           type: string
-        consentStatus:
+          minLength: 1
+          maxLength: 253
+          description: Hostname the consent was given on.
+        categories:
+          $ref: "#/components/schemas/CookieConsentCategories"
+        visitorId:
           type: string
-        consentTimestamp:
-          type: string
-          format: date-time
+          maxLength: 128
         ipAddress:
           type: string
+          maxLength: 64
+          description: >-
+            Optional. Only ever stored anonymized; omit it and the API reads
+            its trusted edge headers instead.
         userAgent:
           type: string
-        cookiePreferences:
-          type: object
-          additionalProperties:
-            $ref: "#/components/schemas/CookieCategoryConsent"
-    CookieCategoryConsent:
-      type: object
-      required: [allowed]
-      properties:
-        allowed:
-          type: boolean
-        cookieRecords:
-          type: array
-          items:
-            type: object
-            required: [cookie, duration, description]
-            properties:
-              cookie:
-                type: string
-              duration:
-                type: string
-              description:
-                type: string
+          maxLength: 512
+        consentText:
+          type: string
+          maxLength: 2000
+          description: The exact legal text shown to the visitor.
+        policyVersion:
+          type: string
+          maxLength: 64
+        timestamp:
+          type: integer
+          format: int64
+          description: >-
+            Milliseconds since the epoch. Defaults to receipt time; accepted up
+            to 5 minutes ahead and up to 7 days old.
     CookieConsentResult:
       type: object
       required: [success]
