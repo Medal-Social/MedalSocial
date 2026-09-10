@@ -661,7 +661,7 @@ console.log(workspaces); // [{ id, name, slug }]
 
 Build a two-way bridge: receive helpdesk events on a webhook, and reply through the API.
 
-Every delivery is signed. The `X-Medal-Signature` header carries `sha256=<base64(HMAC-SHA256("{timestamp}.{rawBody}", secret))>`, where `timestamp` is the `X-Medal-Timestamp` header (Unix ms). Use `verifyWebhookSignature` to authenticate the delivery and get a fully typed event back — it recomputes the HMAC with Web Crypto (Web Crypto: Node.js, Deno, Bun, Cloudflare Workers) and rejects stale timestamps (default tolerance 5 minutes).
+Every delivery is signed. The `X-Medal-Signature` header carries `sha256=<base64(HMAC-SHA256("{timestamp}.{rawBody}", secret))>`, where `timestamp` is the `X-Medal-Timestamp` header (Unix ms). Use `verifyWebhookSignature` to authenticate the delivery and get a fully typed event back — it recomputes the HMAC with Web Crypto, so it runs on Node.js, Deno, Bun and Cloudflare Workers alike and rejects stale timestamps (default tolerance 5 minutes).
 
 ```ts
 import { Medal, verifyWebhookSignature, WebhookVerificationError } from '@medalsocial/sdk';
