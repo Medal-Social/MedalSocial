@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { BaseClient, createMedalClient, Medal, MedalApiError } from "../src";
+import { BaseClient, createMedalClient, Medal, MedalApiError, MedalTimeoutError } from "../src";
 import type { components } from "../src/openapi.generated";
 
 // Compile-time guard: the OPENAPI-DERIVED type must carry the same
@@ -166,7 +166,7 @@ describe("retries", () => {
     expect(spy).toHaveBeenCalledTimes(2);
   });
 
-  it("retries on 500 with linear backoff", async () => {
+  it("retries on 500 with exponential, jittered backoff", async () => {
     const spy = vi.spyOn(globalThis, "fetch");
     spy.mockResolvedValueOnce(new Response("", { status: 500 }));
     spy.mockResolvedValueOnce(mockJson({ data: { id: "d1" } }));
@@ -1646,7 +1646,9 @@ describe("timeout and Retry-After handling", () => {
     );
 
     const medal = new Medal("medal_test", { baseUrl: BASE, timeout: 50 });
-    await expect(medal.contacts.list()).rejects.toThrow(/abort/i);
+    // A stalled body is the deadline's failure, not the wallet's: it surfaces
+    // as the typed MedalTimeoutError rather than a raw AbortError (SDK-13).
+    await expect(medal.contacts.list()).rejects.toBeInstanceOf(MedalTimeoutError);
   }, 2000);
 
   it("does not let a stalled error body block the retry", async () => {
@@ -1685,6 +1687,6 @@ describe("timeout and Retry-After handling", () => {
         }),
     );
     const medal = new Medal("medal_test", { baseUrl: BASE, timeout: 10 });
-    await expect(medal.contacts.list()).rejects.toThrow(/abort/i);
+    await expect(medal.contacts.list()).rejects.toBeInstanceOf(MedalTimeoutError);
   });
 });

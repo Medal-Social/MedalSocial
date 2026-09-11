@@ -67,8 +67,11 @@ const RecordConsentSchema = z.object({
 const CreateDealSchema = z.object({
   title: z.string(),
   description: z.string().optional(),
+  /** MAJOR currency units — 50000 is fifty thousand kroner, not 500. */
   value: z.number().optional(),
-  currency: z.string().optional(),
+  // The four codes the API validates against; a tool that offered any string
+  // would let an agent send one the API answers 400 for.
+  currency: z.enum(["USD", "EUR", "GBP", "NOK"]).optional(),
   contact_email: z.email().optional(),
   notes: z.string().optional(),
 });

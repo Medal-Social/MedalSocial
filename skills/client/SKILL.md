@@ -58,38 +58,65 @@ Every request gets:
 - `x-workspace-id: <workspaceId>` (only if `workspaceId` was set on the constructor)
 - `User-Agent: medalsocial-sdk/<version>` (best-effort — browsers reject custom User-Agent; the SDK swallows that error silently)
 
-Per-call extras go in `RequestOptions.headers` (accepted by `get`, `post`, `postOnce`, `patch`, `delete` on `BaseClient`). The named options win over a same-named bag entry: `{ headers: { "idempotency-key": "a" }, idempotencyKey: "b" }` sends `b`. The SDK uses this itself for the customer portal's `X-Portal-Session` header — you never set that one by hand; pass the session token to `medal.portal.*` instead. Bag keys are lower-cased before the protected names (`content-type`, the named options) are applied, so capitalisation cannot smuggle a duplicate past them. `retry: false` sends a request exactly once (no 429/5xx retry) on every verb (`post`, `patch`, `delete`) — used by `portal.login.verify`, `portal.logout` and `portal.deleteMe`, where the first attempt may have consumed the code or revoked the session and a retry would misreport success as failure, and by `portal.updateMe`, where a `marketing_consent` change records a consent event a retry would repeat.
+Per-call extras go in `RequestOptions.headers` (accepted by `get`, `post`, `postOnce`, `put`, `patch`, `delete` on `BaseClient`). The named options win over a same-named bag entry: `{ headers: { "idempotency-key": "a" }, idempotencyKey: "b" }` sends `b`. The SDK uses this itself for the customer portal's `X-Portal-Session` header — you never set that one by hand; pass the session token to `medal.portal.*` instead. Bag keys are lower-cased before the protected names (`content-type`, the named options) are applied, so capitalisation cannot smuggle a duplicate past them. `retry: false` sends a request exactly once (no 429/5xx retry) on every verb (`post`, `put`, `patch`, `delete`) — used by `portal.login.verify`, `portal.logout` and `portal.deleteMe`, where the first attempt may have consumed the code or revoked the session and a retry would misreport success as failure, and by `portal.updateMe`, where a `marketing_consent` change records a consent event a retry would repeat.
 
 ## Retry behavior
 
 `BaseClient.request` retries on **429 and 5xx** for up to **3 attempts total**:
 
-- If the response has a `retry-after` header (in seconds), the SDK waits that long.
-- Otherwise it waits `250 * attempt` ms (so 250, 500 between the first three attempts).
+- If the response has a `retry-after` header, the SDK waits that long. **Both wire
+  forms are parsed** — delay-seconds and HTTP-date — and a date already in the
+  past clamps to zero rather than going negative.
+- Otherwise it waits an exponential backoff spread ±25%: ~250 ms, then ~500 ms.
+  The jitter is deliberate — without it every client knocked back by one 503
+  returns in lock-step and hits the recovering server as a single wave.
+  `backoffDelayMs(attempt, random?)` and `parseRetryAfterMs(value, now?)` are
+  exported so both rules can be asserted rather than assumed.
 - Other 4xx errors are NOT retried — they throw `MedalApiError` immediately.
-- Network errors (fetch throws) are NOT retried — they bubble up.
-- The request is aborted via `AbortController` after `timeout` ms. That budget covers the **whole exchange** — headers and body — per attempt. It is fixed wall-clock time: progress on the body does not extend it, so raise `timeout` if you pull responses large enough to take longer than it to arrive. Retry backoff is not charged against it.
+- A **network** failure (fetch throws a `TypeError`: DNS, TLS, reset, offline) is
+  retried only when repeating the request cannot duplicate anything — a `GET`, or
+  a write that carries an `Idempotency-Key`. An unkeyed `POST` is sent exactly
+  once and throws `MedalNetworkError`.
+- The request is aborted via `AbortController` after `timeout` ms. That budget covers the **whole exchange** — headers and body — per attempt. It is fixed wall-clock time: progress on the body does not extend it, so raise `timeout` if you pull responses large enough to take longer than it to arrive. Retry backoff is not charged against it. A timeout throws `MedalTimeoutError`.
+- `RequestOptions.signal` merges YOUR cancellation into the same controller, and
+  it also wakes a retry out of its backoff. Aborting rejects with your own abort
+  reason, never with `MedalTimeoutError` — cancelling is not a Medal failure.
 
 The SDK **drains** the response body of any attempt it abandons to a retry, so the connection returns to the pool instead of being held open. The body is streamed to a sink rather than buffered, so a large error page costs no memory. A drain that fails is ignored — the retry proceeds on the status.
 
 ## Errors
 
-Non-2xx responses throw `MedalApiError`:
+Three classes, one base. `MedalError` is the base of all of them, so a single
+clause covers every failure the SDK raises:
+
+| Class | `code` | When |
+|-------|--------|------|
+| `MedalApiError` | the API's `error.code` | A 4xx/5xx response |
+| `MedalTimeoutError` | `TIMEOUT` | The per-attempt deadline elapsed |
+| `MedalNetworkError` | `NETWORK` | No response was produced at all |
 
 ```ts
-import { Medal, MedalApiError } from "@medalsocial/sdk";
+import { Medal, MedalApiError, MedalError, MedalTimeoutError } from "@medalsocial/sdk";
 
 try {
   await medal.posts.create({ content: "hi", channel_ids: ["ch_1"] });
 } catch (err) {
   if (err instanceof MedalApiError) {
-    err.status;   // HTTP status code
-    err.code;     // API error code (e.g. "INVALID_REQUEST") or "UNKNOWN_ERROR"
-    err.message;  // error.message from the API body, or "HTTP <status>: <statusText>"
-    err.details;  // optional details from the API body
+    err.status;       // HTTP status code
+    err.code;         // API error code — a MedalErrorCode, e.g. "VALIDATION_ERROR"
+    err.message;      // error.message from the API body, or "HTTP <status>: <statusText>"
+    err.details;      // optional details from the API body
+    err.requestId;    // X-Request-ID of the failing response — quote it to support
+    err.retryAfterMs; // parsed Retry-After, or null
+  } else if (err instanceof MedalError) {
+    err.code;         // "TIMEOUT" | "NETWORK"
   }
 }
 ```
+
+Branch on `code`, never on `message`. `MedalErrorCode` is a union of the codes
+the API throws today widened with `string`, so a code Medal adds later still
+type-checks — handle an unknown one as a generic failure of its HTTP status.
 
 The `Medal` instance does **not** expose the underlying `BaseClient` — it's created as a local `const` in the constructor and only passed into the resource classes. There is no public way to read the resolved config from a `Medal` instance. If you need the same config later (for logging, custom requests), store your `MedalOptions` separately when you construct the client.
 

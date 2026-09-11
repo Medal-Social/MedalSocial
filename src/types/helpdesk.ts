@@ -185,3 +185,42 @@ export interface ReplyCreateResult {
   conversation_id: string;
   status: string;
 }
+
+/**
+ * Input for binding a conversation's sender to a CRM contact — exactly one of
+ * `contact_id` or `email`.
+ *
+ * `email` resolves through the CRM's own find-or-create, so a partner does not
+ * have to pre-create a contact first. Sending both, or neither, is a
+ * `400 VALIDATION_ERROR`.
+ */
+export type LinkConversationContactInput =
+  | { contact_id: string; email?: never }
+  | { email: string; contact_id?: never };
+
+/** Result of linking a conversation's sender to a CRM contact. */
+export interface ConversationContactLinkResult {
+  conversation_id: string;
+  contact_id: string;
+  /** The contact the sender was linked to before, when this replaced a link. */
+  previous_contact_id: string | null;
+  contact_link_source: "partner";
+  /** Unix timestamp in milliseconds. */
+  contact_linked_at: number;
+  /**
+   * How many of this sender's conversations now carry the contact — the link is
+   * stored per SENDER, so it reaches their older threads too.
+   */
+  conversations_updated: number;
+}
+
+/**
+ * Result of unlinking. Idempotent: unlinking a thread that carries no contact
+ * answers `unlinked: false` rather than an error.
+ */
+export interface ConversationContactUnlinkResult {
+  conversation_id: string;
+  unlinked: boolean;
+  previous_contact_id: string | null;
+  conversations_updated: number;
+}

@@ -177,15 +177,18 @@ export class Medal {
       options?.autoConfirmCapabilities,
     );
 
+    // Every resource that owns a confirmable write route gets the confirmer.
+    // Bookings, workspaces and the portal are absent from the server's
+    // confirmable registry, so they take the plain client.
     this.bookings = new Bookings(client);
     this.channels = new Channels(client, confirmer);
-    this.emails = new Emails(client);
-    this.contacts = new Contacts(client);
-    this.deals = new Deals(client);
-    this.gdpr = new Gdpr(client);
+    this.emails = new Emails(client, confirmer);
+    this.contacts = new Contacts(client, confirmer);
+    this.deals = new Deals(client, confirmer);
+    this.gdpr = new Gdpr(client, confirmer);
     this.helpdesk = new Helpdesk(client, confirmer);
     this.portal = new Portal(client);
-    this.posts = new Posts(client);
+    this.posts = new Posts(client, confirmer);
     this.scan = new Scan(client);
     this.webhooks = new Webhooks(client, confirmer);
     this.workspaces = new Workspaces(client);
@@ -194,7 +197,7 @@ export class Medal {
 
 export { CapabilityConfirmer } from "./capability-confirmer";
 export type { RequestOptions } from "./client";
-export { BaseClient } from "./client";
+export { BaseClient, backoffDelayMs, paginate, parseRetryAfterMs } from "./client";
 export type {
   components as OpenApiComponents,
   operations as OpenApiOperations,
@@ -209,7 +212,7 @@ export { Deals } from "./resources/deals";
 export { Emails } from "./resources/emails";
 export { Gdpr } from "./resources/gdpr";
 export { Helpdesk } from "./resources/helpdesk";
-export { Portal } from "./resources/portal";
+export { Portal, PortalSessionScope } from "./resources/portal";
 export { Posts } from "./resources/posts";
 export { Scan } from "./resources/scan";
 export { Webhooks } from "./resources/webhooks";
@@ -217,6 +220,9 @@ export { Workspaces } from "./resources/workspaces";
 export type {
   Booking,
   BookingActionResult,
+  BookingAttentionFeed,
+  BookingAttentionItem,
+  BookingAttentionKind,
   BookingAvailabilityOptions,
   BookingCancelledBy,
   BookingClaimableCreatedVia,
@@ -224,11 +230,14 @@ export type {
   BookingCreatedVia,
   BookingCreateResult,
   BookingEvent,
+  BookingEventHost,
   BookingEventRegistration,
   BookingEventRegistrationPaymentError,
   BookingEventRegistrationResult,
+  BookingEventRemoveResult,
   BookingEventStatus,
   BookingEventTemplateKey,
+  BookingNextGap,
   BookingPayment,
   BookingPaymentMode,
   BookingPaymentStart,
@@ -237,6 +246,8 @@ export type {
   BookingRescheduleResult,
   BookingResource,
   BookingResourceType,
+  BookingRevenueByProvider,
+  BookingRevenueProvider,
   BookingScheduleDay,
   BookingScheduleOptions,
   BookingService,
@@ -244,11 +255,14 @@ export type {
   BookingStatus,
   BookingsPage,
   BookingsPagination,
+  BookingsToday,
+  BookingsTodayOptions,
   BookingTimestampInput,
   CancelBookingInput,
   ContactPerson,
   ContactRelation,
   ContactRelations,
+  CreateBookingEventHostInput,
   CreateBookingEventInput,
   CreateBookingInput,
   CreateBookingItemInput,
@@ -267,7 +281,9 @@ export type {
   RelationType,
   RescheduleBookingInput,
   StartBookingPaymentInput,
+  UpdateBookingEventHostInput,
   UpdateBookingInput,
+  WaitForSettlementOptions,
 } from "./types/bookings";
 export type {
   AutoConfirmContext,
@@ -285,6 +301,7 @@ export type {
   ChannelConnection,
   ChannelConnectionDisconnectResult,
   ChannelConnectionState,
+  ChannelType,
   ConnectLink,
   ConnectLinkCreateResult,
   ConnectLinkRevokeResult,
@@ -294,12 +311,19 @@ export type {
 } from "./types/channels";
 export type {
   ApiResponse,
+  MedalApiErrorMeta,
+  MedalErrorCode,
   PaginatedResponse,
   PaginationOptions,
   TimestampInput,
 } from "./types/common";
 // Re-export all types
-export { MedalApiError } from "./types/common";
+export {
+  MedalApiError,
+  MedalError,
+  MedalNetworkError,
+  MedalTimeoutError,
+} from "./types/common";
 export type {
   Activity,
   AddNoteInput,
@@ -321,6 +345,7 @@ export type {
   CreateDealInput,
   Deal,
   DealCreateResult,
+  DealCurrency,
   DealRemoveResult,
   DealStatus,
   DealUpdateResult,
@@ -355,6 +380,8 @@ export type {
 export type {
   ContactLinkSource,
   Conversation,
+  ConversationContactLinkResult,
+  ConversationContactUnlinkResult,
   ConversationMessage,
   ConversationStatus,
   ConversationUpdateResult,
@@ -362,6 +389,7 @@ export type {
   HelpdeskChannel,
   HelpdeskChatType,
   HelpdeskMessageType,
+  LinkConversationContactInput,
   ListConversationsOptions,
   MessageAuthorType,
   MessageDeliveryStatus,
@@ -386,6 +414,10 @@ export type {
   PortalProfilePatch,
   PortalSession,
   PortalVerifyInput,
+  PortalVippsExchangeInput,
+  PortalVippsSession,
+  PortalVippsStart,
+  PortalVippsStartInput,
 } from "./types/portal";
 export type {
   Channel,
