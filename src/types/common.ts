@@ -32,3 +32,10 @@ export interface PaginationOptions {
   limit?: number;
   cursor?: string;
 }
+
+/**
+ * A timestamp on the way IN to a list filter: Unix milliseconds, or an ISO
+ * 8601 date-time string. The API normalises both to milliseconds; anything
+ * else is a `400 VALIDATION_ERROR`.
+ */
+export type TimestampInput = number | string;

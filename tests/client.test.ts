@@ -538,11 +538,11 @@ describe("deals", () => {
   it("lists deals with filters", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
       const parsed = new URL(url as string);
-      expect(parsed.searchParams.get("status")).toBe("open");
+      expect(parsed.searchParams.get("status")).toBe("negotiating");
       return mockJson({ data: [], pagination: { has_more: false, next_cursor: null } });
     });
     const medal = new Medal("medal_test", { baseUrl: BASE });
-    await medal.deals.list({ status: "open" });
+    await medal.deals.list({ status: "negotiating" });
   });
 
   it("lists deals with search", async () => {
@@ -593,7 +593,7 @@ describe("deals", () => {
       return mockJson({ data: { success: true } });
     });
     const medal = new Medal("medal_test", { baseUrl: BASE });
-    const { data } = await medal.deals.update("d1", { status: "won" });
+    const { data } = await medal.deals.update("d1", { status: "signed" });
     expect(data.success).toBe(true);
   });
 

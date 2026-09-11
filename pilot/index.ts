@@ -16,7 +16,7 @@ const CreateContactSchema = z.object({
   phone: z.string().optional(),
   company: z.string().optional(),
   job_title: z.string().optional(),
-  status: z.enum(["lead", "prospect", "customer", "churned", "archived"]).optional(),
+  status: z.enum(["lead", "subscriber", "customer", "churned"]).optional(),
   notes: z.string().optional(),
 });
 

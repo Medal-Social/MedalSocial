@@ -45,6 +45,7 @@ interface MedalOptions {
   baseUrl?: string;       // defaults to https://io.medalsocial.com
   timeout?: number;       // ms; default 30000
   workspaceId?: string;   // required for OAuth tokens, ignored for API keys
+  autoConfirmCapabilities?: { previewSummary: (ctx) => string }; // OFF by default — see the resources skill
 }
 ```
 
@@ -100,8 +101,8 @@ The package is published with provenance attestation via npm OIDC trusted publis
 
 The SDK uses standard Web Fetch + `AbortController` and has no Node-only APIs, so it runs in Deno, Bun, Cloudflare Workers, and modern browsers.
 
-**Browser usage caveat:** the Medal API does not currently support CORS for arbitrary origins — calls from browser code typically need a server-side proxy that holds the API key. Don't embed a `medal_*` key in client-side JavaScript regardless; it grants full workspace access.
+**Browser usage caveat:** the `/api/v1` routes answer `Access-Control-Allow-Origin: *`, so a browser *can* call them — which is exactly why you must not: the only credential the SDK sends is the API key, and a `medal_*` key in client-side JavaScript grants full workspace access to anyone who reads the bundle. Keep the key on a server (a thin proxy or your own backend) and call the SDK from there. The one browser-shaped surface is the customer portal, and even there the site's *server* holds the key and the session cookie.
 
-**Node:** `package.json` enforces `engines.node >=24`. Older Node is blocked at install time. If you need Node 18–22 support, relax `engines` in your fork and verify against the SDK's test suite first.
+**Node:** `package.json` declares `engines.node >=20`; CI runs the unit suite on 20, 22 and 24. The client uses only `fetch`, `AbortController`, `WritableStream` and Web Crypto (`crypto.subtle`, `crypto.randomUUID`), all present since Node 20. Developing the SDK itself needs Node 22+ (the release tooling requires it), but that is a contributor constraint, not a consumer one.
 
 **Cloudflare Workers / edge:** works out of the box; the `User-Agent` set is silently rejected (workers also disallow it) and the SDK swallows the error.

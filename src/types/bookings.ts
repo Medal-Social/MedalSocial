@@ -421,6 +421,12 @@ export interface ListBookingsOptions extends PaginationOptions {
   to_ts?: BookingTimestampInput;
   status?: BookingStatus;
   resource_id?: string;
+  /**
+   * Only bookings with this provenance. Unlike `create`, EVERY value the
+   * column holds is filterable here — asking about walk-ins is not the same
+   * as claiming to be one. Any other value is a `400`.
+   */
+  created_via?: BookingCreatedVia;
 }
 
 /** Options for listing the service catalogue. The endpoint is not paginated. */

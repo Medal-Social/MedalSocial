@@ -1,11 +1,18 @@
 import type { BookingStatus, RelationType } from "./bookings";
 
+/**
+ * Locale of the one-time-code e-mail. The API accepts exactly these two —
+ * `nb`, `nn`, `no-NB` and every other spelling of Norwegian are a
+ * `400 VALIDATION_ERROR`.
+ */
+export type PortalLocale = "no" | "en";
+
 /** Input for starting an e-mail one-time-code login. */
 export interface PortalLoginStartInput {
   /** The address the code is sent to. */
   email: string;
-  /** Locale for the e-mail (e.g. `nb`, `en`); the workspace default when omitted. */
-  locale?: string;
+  /** Locale for the e-mail (`no` or `en`); the workspace default when omitted. */
+  locale?: PortalLocale;
 }
 
 /**

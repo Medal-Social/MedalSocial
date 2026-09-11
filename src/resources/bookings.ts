@@ -401,6 +401,7 @@ export class Bookings {
     if (options?.resource_id) params.resource_id = options.resource_id;
     if (options?.from_ts !== undefined) params.from_ts = String(options.from_ts);
     if (options?.to_ts !== undefined) params.to_ts = String(options.to_ts);
+    if (options?.created_via) params.created_via = options.created_via;
     return this.client.get("/api/v1/bookings", params);
   }
 

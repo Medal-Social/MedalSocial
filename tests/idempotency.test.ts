@@ -63,7 +63,10 @@ const KEYED_WRITES: {
   {
     name: "webhooks.create",
     call: (m, o) =>
-      m.webhooks.create({ name: "Hook", url: "https://x.test/hook", event_types: ["*"] }, o),
+      m.webhooks.create(
+        { name: "Hook", url: "https://x.test/hook", event_types: ["helpdesk.message_received"] },
+        o,
+      ),
   },
   {
     name: "channels.connectLinks.create",
@@ -225,7 +228,10 @@ describe("capability confirmation binding survives the conversion", () => {
       name: "webhooks.create",
       path: "/api/v1/webhooks",
       call: (m, o) =>
-        m.webhooks.create({ name: "Hook", url: "https://x.test/hook", event_types: ["*"] }, o),
+        m.webhooks.create(
+          { name: "Hook", url: "https://x.test/hook", event_types: ["helpdesk.message_received"] },
+          o,
+        ),
     },
     {
       name: "channels.connectLinks.create",

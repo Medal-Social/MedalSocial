@@ -21,6 +21,16 @@ export class Deals {
     if (options?.cursor) params.cursor = options.cursor;
     if (options?.status) params.status = options.status;
     if (options?.search) params.search = options.search;
+    if (options?.close_date_from !== undefined) {
+      params.close_date_from = String(options.close_date_from);
+    }
+    if (options?.close_date_to !== undefined) {
+      params.close_date_to = String(options.close_date_to);
+    }
+    if (options?.min_value !== undefined) params.min_value = String(options.min_value);
+    if (options?.company_name) params.company_name = options.company_name;
+    if (options?.contact_id) params.contact_id = options.contact_id;
+    if (options?.stage) params.stage = options.stage;
     return this.client.get("/api/v1/deals", params);
   }
 

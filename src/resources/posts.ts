@@ -23,6 +23,16 @@ export class Posts {
     if (options?.cursor) params.cursor = options.cursor;
     if (options?.status) params.status = options.status;
     if (options?.type) params.type = options.type;
+    if (options?.scheduled_from !== undefined) {
+      params.scheduled_from = String(options.scheduled_from);
+    }
+    if (options?.scheduled_to !== undefined) params.scheduled_to = String(options.scheduled_to);
+    if (options?.published_from !== undefined) {
+      params.published_from = String(options.published_from);
+    }
+    if (options?.published_to !== undefined) params.published_to = String(options.published_to);
+    if (options?.platforms) params.platforms = options.platforms.join(",");
+    if (options?.query) params.query = options.query;
     return this.client.get("/api/v1/posts", params);
   }
 
