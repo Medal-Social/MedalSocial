@@ -4043,6 +4043,7 @@ components:
         - body
         - delivery_status
         - delivery_error
+        - externally_deleted_at
         - created_at
       properties:
         id:
@@ -4073,6 +4074,15 @@ components:
           type: [string, "null"]
           description: >-
             Last send error for a `failed` outbound message, otherwise `null`.
+        externally_deleted_at:
+          type: [integer, "null"]
+          description: >-
+            Unix timestamp in milliseconds when the customer deleted the
+            message on the external channel (Telegram today), otherwise
+            `null`. The message is kept as a tombstone so the thread still
+            reads in order, but its `body` is empty and any attachment has
+            been erased — mirror the deletion in your own store. Also
+            delivered as the `helpdesk.message_deleted` webhook event.
         created_at:
           type: integer
           description: Unix timestamp in milliseconds.

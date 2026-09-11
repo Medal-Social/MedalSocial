@@ -145,6 +145,12 @@ export interface Activity {
   content: string | null;
   actor_name: string | null;
   actor_type: string | null;
+  /**
+   * Type-specific details (an email subject, a clicked link, …), or `null`.
+   * Deliberately `unknown`: the server stores this column as free-form JSON
+   * and returns it untouched, so its shape depends on `type`. Narrow it
+   * yourself before reading into it.
+   */
   metadata: unknown;
   created_at: string | null;
 }

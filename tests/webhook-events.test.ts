@@ -132,9 +132,37 @@ describe("verifyWebhookSignature", () => {
       case "helpdesk.conversation_status_changed":
         expect(event.data.status).toBe("closed");
         expect(event.data.previousStatus).toBe("open");
+        expect(event.data.reason).toBeUndefined();
         break;
       default:
         expect.unreachable();
+    }
+  });
+
+  it("narrows a reopen-by-message status change with its reason", async () => {
+    const payload = JSON.stringify({
+      id: "del_2b",
+      type: "helpdesk.conversation_status_changed",
+      created_at: Date.now(),
+      workspace_id: "ws_1",
+      data: {
+        channel: "telegram",
+        channelConnectionId: "conn_1",
+        conversation: { id: "conv_1", status: "open" },
+        status: "open",
+        previousStatus: "snoozed",
+        reason: "message_reopened",
+      },
+    });
+    const timestamp = String(Date.now());
+    const signature = await sign(payload, timestamp);
+    const event = await verifyWebhookSignature({ payload, timestamp, signature, secret: SECRET });
+    expect(event.type).toBe("helpdesk.conversation_status_changed");
+    if (event.type === "helpdesk.conversation_status_changed") {
+      expect(event.data.status).toBe("open");
+      expect(event.data.previousStatus).toBe("snoozed");
+      expect(event.data.reason).toBe("message_reopened");
+      expect(event.data.conversation.status).toBe("open");
     }
   });
 

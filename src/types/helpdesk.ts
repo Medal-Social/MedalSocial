@@ -110,6 +110,16 @@ export interface ConversationMessage {
    * no error to report (including on inbound messages and internal notes).
    */
   delivery_error: string | null;
+  /**
+   * Unix timestamp in milliseconds when the customer deleted this message on
+   * the external channel (Telegram today), otherwise `null`.
+   *
+   * A deleted message is kept as a TOMBSTONE so the thread still reads in
+   * order: its `body` is empty and any attachment has been erased. Mirror the
+   * deletion in your own store rather than treating it as a blank message.
+   * The push-side signal is the `helpdesk.message_deleted` webhook event.
+   */
+  externally_deleted_at: number | null;
   /** Unix timestamp in milliseconds. */
   created_at: number;
 }

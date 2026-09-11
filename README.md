@@ -511,6 +511,8 @@ for (const message of messages) {
 
 Subscribe to `helpdesk.message_delivery_updated` for the same values pushed instead of polled.
 
+**Upstream deletions.** When the customer deletes a message on the external channel (Telegram today), the message is kept as a *tombstone* so the thread still reads in order: `externally_deleted_at` carries the Unix-ms timestamp of the deletion, `body` is empty and any attachment has been erased. Mirror the deletion in your own store rather than treating it as a blank message; the push-side signal is the `helpdesk.message_deleted` webhook event, whose payload deliberately carries an empty body too.
+
 ### Webhooks
 
 ```ts
@@ -833,7 +835,7 @@ pnpm openapi:check
 
 ## Runtime Support
 
-Node.js 20+ (see `engines.node`; the unit suite runs on 20, 22 and 24 in CI) and modern browsers. Uses native `fetch` — no polyfills required. Developing the SDK itself needs Node 22+, which the release tooling (`changesets`, `secretlint`, `lint-staged`) requires.
+Node.js 22+ (see `engines.node`; the unit suite runs on 22 and 24 in CI) and modern browsers. Uses native `fetch` — no polyfills required. The client itself only needs `fetch`, `AbortController`, `WritableStream` and Web Crypto, but Node 20 reached end-of-life in April 2026 and the SDK's own toolchain (pnpm 11, `changesets`, `secretlint`, `lint-staged`) needs 22.13+, so 22 is the floor the SDK certifies.
 
 The individual helpers only need Web Crypto and `fetch`, so they also run on Deno, Bun and Cloudflare Workers.
 

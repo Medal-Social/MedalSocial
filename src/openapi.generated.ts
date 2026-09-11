@@ -2257,6 +2257,8 @@ export interface components {
       delivery_status: components["schemas"]["HelpdeskMessageDeliveryStatus"] | null;
       /** @description Last send error for a `failed` outbound message, otherwise `null`. */
       delivery_error: string | null;
+      /** @description Unix timestamp in milliseconds when the customer deleted the message on the external channel (Telegram today), otherwise `null`. The message is kept as a tombstone so the thread still reads in order, but its `body` is empty and any attachment has been erased — mirror the deletion in your own store. Also delivered as the `helpdesk.message_deleted` webhook event. */
+      externally_deleted_at: number | null;
       /** @description Unix timestamp in milliseconds. */
       created_at: number;
     };

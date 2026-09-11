@@ -13,14 +13,20 @@
  * Node.js 18+, Deno, Bun, Cloudflare Workers, and browsers.
  */
 
-import type { ContactLinkSource, HelpdeskChannel, HelpdeskChatType } from "./types/helpdesk";
+import type {
+  ContactLinkSource,
+  ConversationStatus,
+  HelpdeskChannel,
+  HelpdeskChatType,
+  MessageDeliveryStatus,
+} from "./types/helpdesk";
 
 /** Snapshot of a conversation included in every helpdesk webhook event. */
 export interface WebhookConversationSnapshot {
   id: string;
   channel: HelpdeskChannel;
   channelConnectionId: string | null;
-  status: string;
+  status: ConversationStatus;
   subject: string | null;
   assigneeUserId: string | null;
   contactId: string | null;
@@ -52,7 +58,8 @@ export interface WebhookMessageSnapshot {
   authorUserId: string | null;
   authorName: string | null;
   externalMessageId: string | null;
-  deliveryStatus: string | null;
+  /** Outbound delivery state — the same values as `ConversationMessage.delivery_status`. */
+  deliveryStatus: MessageDeliveryStatus | null;
   deliveryError: string | null;
   /** Unix timestamp in milliseconds. */
   createdAt: number;
@@ -61,7 +68,7 @@ export interface WebhookMessageSnapshot {
 /** Fields present in the `data` of every helpdesk event. */
 interface HelpdeskEventData {
   /** Channel type at the top level, for quick filtering. */
-  channel: string;
+  channel: HelpdeskChannel;
   channelConnectionId: string | null;
   conversation: WebhookConversationSnapshot;
 }
@@ -94,8 +101,14 @@ export interface ConversationAssignedEvent extends WebhookEventBase {
 export interface ConversationStatusChangedEvent extends WebhookEventBase {
   type: "helpdesk.conversation_status_changed";
   data: HelpdeskEventData & {
-    status: string;
-    previousStatus: string;
+    status: ConversationStatus;
+    previousStatus: ConversationStatus;
+    /**
+     * Present only when a new customer message reopened a snoozed or closed
+     * thread (`status` is then `open`). Absent when an operator or the API
+     * changed the status directly.
+     */
+    reason?: "message_reopened";
   };
 }
 
