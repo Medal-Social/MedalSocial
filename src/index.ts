@@ -194,7 +194,7 @@ export class Medal {
 
 export { CapabilityConfirmer } from "./capability-confirmer";
 export type { RequestOptions } from "./client";
-export { BaseClient } from "./client";
+export { backoffDelayMs, BaseClient, parseRetryAfterMs } from "./client";
 export type {
   components as OpenApiComponents,
   operations as OpenApiOperations,
@@ -298,8 +298,14 @@ export type {
   PaginationOptions,
   TimestampInput,
 } from "./types/common";
+export type { MedalApiErrorMeta } from "./types/common";
 // Re-export all types
-export { MedalApiError } from "./types/common";
+export {
+  MedalApiError,
+  MedalError,
+  MedalNetworkError,
+  MedalTimeoutError,
+} from "./types/common";
 export type {
   Activity,
   AddNoteInput,
