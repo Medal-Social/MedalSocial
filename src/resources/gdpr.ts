@@ -1,3 +1,4 @@
+import { CapabilityConfirmer } from "../capability-confirmer";
 import type { BaseClient, RequestOptions } from "../client";
 import type { ApiResponse } from "../types/common";
 import type {
@@ -8,10 +9,17 @@ import type {
   GdprExport,
   RecordConsentInput,
 } from "../types/gdpr";
+import { CapabilityConfirmations } from "./capability-confirmations";
 
 /** Manage GDPR compliance — data exports, consent records, and cookie consent. */
 export class Gdpr {
-  constructor(private client: BaseClient) {}
+  private client: BaseClient;
+  private confirmer: CapabilityConfirmer;
+
+  constructor(client: BaseClient, confirmer?: CapabilityConfirmer) {
+    this.client = client;
+    this.confirmer = confirmer ?? new CapabilityConfirmer(new CapabilityConfirmations(client));
+  }
 
   /**
    * Request a workspace data export. Runs asynchronously.
@@ -25,7 +33,12 @@ export class Gdpr {
   async requestExport(
     options?: RequestOptions,
   ): Promise<ApiResponse<{ request_id: string; status: string }>> {
-    return this.client.postOnce("/api/v1/gdpr/export", undefined, options);
+    const resolved = await this.confirmer.prepare(
+      { capabilityId: "compliance.gdpr.export.execute", body: undefined },
+      undefined,
+      options,
+    );
+    return this.client.postOnce("/api/v1/gdpr/export", undefined, resolved);
   }
 
   /** List all workspace export requests. */
@@ -45,8 +58,11 @@ export class Gdpr {
    * (workspace, email, consent type) and overwritten in place, so re-sending
    * the same body reaches the same state and returns the same record id.
    */
-  async recordConsent(input: RecordConsentInput): Promise<ApiResponse<ConsentResult>> {
-    return this.client.post("/api/v1/gdpr/consent", input);
+  async recordConsent(
+    input: RecordConsentInput,
+    options?: RequestOptions,
+  ): Promise<ApiResponse<ConsentResult>> {
+    return this.client.post("/api/v1/gdpr/consent", input, options);
   }
 
   /** Get all consent records for a contact by email. */
@@ -85,7 +101,10 @@ export class Gdpr {
    * });
    * ```
    */
-  async cookieConsent(input: CookieConsentInput): Promise<CookieConsentResult> {
-    return this.client.post("/api/cookie-consent", input);
+  async cookieConsent(
+    input: CookieConsentInput,
+    options?: RequestOptions,
+  ): Promise<CookieConsentResult> {
+    return this.client.post("/api/cookie-consent", input, options);
   }
 }

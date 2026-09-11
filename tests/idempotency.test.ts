@@ -73,6 +73,17 @@ const KEYED_WRITES: {
     call: (m, o) => m.channels.connectLinks.create({ channel_type: "telegram_inbox" }, o),
   },
   { name: "gdpr.requestExport", call: (m, o) => m.gdpr.requestExport(o) },
+  // SDK-16: both used to sit in UNKEYED_WRITES below, on the argument that the
+  // status guard makes a repeat harmless. It does stop the second publish — by
+  // answering 400, so the retry of a publish that had already COMMITTED
+  // reported a success as a failure. The key turns that retry into a replay of
+  // the original 200 and its workflow_id, which is the outcome the caller can
+  // actually act on.
+  {
+    name: "posts.schedule",
+    call: (m, o) => m.posts.schedule("p_1", { scheduled_at: 1780000000000 }, o),
+  },
+  { name: "posts.publish", call: (m, o) => m.posts.publish("p_1", o) },
 ];
 
 /**
@@ -82,8 +93,6 @@ const KEYED_WRITES: {
  * this test is where that decision has to be re-argued.
  */
 const UNKEYED_WRITES: { name: string; call: (medal: Medal) => Promise<unknown> }[] = [
-  { name: "posts.schedule", call: (m) => m.posts.schedule("p_1", { scheduled_at: 1780000000000 }) },
-  { name: "posts.publish", call: (m) => m.posts.publish("p_1") },
   {
     name: "gdpr.recordConsent",
     call: (m) =>

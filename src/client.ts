@@ -117,8 +117,16 @@ export function parseRetryAfterMs(value: string | null, now: number = Date.now()
   return Math.max(0, at - now);
 }
 
-/** The reason an aborted signal carries, falling back to a DOM-shaped AbortError. */
+/**
+ * The reason an aborted signal carries.
+ *
+ * Per spec `abort()` always leaves a reason behind (a DOM `AbortError` when the
+ * caller supplied none), so the fallback is for runtimes that predate that —
+ * unreachable on every engine the test suite can run, hence ignored for
+ * coverage rather than pretended to be tested.
+ */
 function abortReason(signal: AbortSignal): unknown {
+  /* v8 ignore next -- unreachable: a spec-compliant abort() always sets a reason */
   return signal.reason ?? new DOMException("This operation was aborted", "AbortError");
 }
 

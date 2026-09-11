@@ -69,6 +69,11 @@ class ChannelConnectLinks {
     return this.client.get("/api/v1/channels/connect-links", params);
   }
 
+  /** `delete` reads better at some call sites; identical to {@link revoke}. */
+  async delete(id: string, options?: RequestOptions): Promise<ApiResponse<ConnectLinkRevokeResult>> {
+    return this.revoke(id, options);
+  }
+
   /** Revoke a pending connect link so it can no longer be consumed. */
   async revoke(
     id: string,
@@ -122,6 +127,14 @@ class ChannelConnections {
       options,
     );
     return this.client.delete(`/api/v1/channels/connections/${encodeURIComponent(id)}`, resolved);
+  }
+
+  /** `delete` reads better at some call sites; identical to {@link disconnect}. */
+  async delete(
+    id: string,
+    options?: RequestOptions,
+  ): Promise<ApiResponse<ChannelConnectionDisconnectResult>> {
+    return this.disconnect(id, options);
   }
 }
 

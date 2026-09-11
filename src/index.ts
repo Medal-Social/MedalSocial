@@ -177,15 +177,18 @@ export class Medal {
       options?.autoConfirmCapabilities,
     );
 
+    // Every resource that owns a confirmable write route gets the confirmer.
+    // Bookings, workspaces and the portal are absent from the server's
+    // confirmable registry, so they take the plain client.
     this.bookings = new Bookings(client);
     this.channels = new Channels(client, confirmer);
-    this.emails = new Emails(client);
-    this.contacts = new Contacts(client);
-    this.deals = new Deals(client);
-    this.gdpr = new Gdpr(client);
+    this.emails = new Emails(client, confirmer);
+    this.contacts = new Contacts(client, confirmer);
+    this.deals = new Deals(client, confirmer);
+    this.gdpr = new Gdpr(client, confirmer);
     this.helpdesk = new Helpdesk(client, confirmer);
     this.portal = new Portal(client);
-    this.posts = new Posts(client);
+    this.posts = new Posts(client, confirmer);
     this.scan = new Scan(client);
     this.webhooks = new Webhooks(client, confirmer);
     this.workspaces = new Workspaces(client);
@@ -194,7 +197,7 @@ export class Medal {
 
 export { CapabilityConfirmer } from "./capability-confirmer";
 export type { RequestOptions } from "./client";
-export { backoffDelayMs, BaseClient, parseRetryAfterMs } from "./client";
+export { BaseClient, backoffDelayMs, parseRetryAfterMs } from "./client";
 export type {
   components as OpenApiComponents,
   operations as OpenApiOperations,
@@ -294,11 +297,11 @@ export type {
 } from "./types/channels";
 export type {
   ApiResponse,
+  MedalApiErrorMeta,
   PaginatedResponse,
   PaginationOptions,
   TimestampInput,
 } from "./types/common";
-export type { MedalApiErrorMeta } from "./types/common";
 // Re-export all types
 export {
   MedalApiError,
@@ -361,6 +364,8 @@ export type {
 export type {
   ContactLinkSource,
   Conversation,
+  ConversationContactLinkResult,
+  ConversationContactUnlinkResult,
   ConversationMessage,
   ConversationStatus,
   ConversationUpdateResult,
@@ -368,6 +373,7 @@ export type {
   HelpdeskChannel,
   HelpdeskChatType,
   HelpdeskMessageType,
+  LinkConversationContactInput,
   ListConversationsOptions,
   MessageAuthorType,
   MessageDeliveryStatus,
