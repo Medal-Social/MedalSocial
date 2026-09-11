@@ -271,7 +271,11 @@ describe("resources built directly, without a shared confirmer (SDK-4)", () => {
   }
 
   const constructed: [string, (client: BaseClient) => Promise<unknown>, string][] = [
-    ["Contacts", (c) => new Contacts(c).addNote("c1", { content: "x" }), "/api/v1/contacts/c1/notes"],
+    [
+      "Contacts",
+      (c) => new Contacts(c).addNote("c1", { content: "x" }),
+      "/api/v1/contacts/c1/notes",
+    ],
     ["Deals", (c) => new Deals(c).create({ title: "Acme" }), "/api/v1/deals"],
     ["Posts", (c) => new Posts(c).publish("p1"), "/api/v1/posts/p1/publish"],
     ["Emails", (c) => new Emails(c).send({ template_slug: "w", to: "a@b.co" }), "/api/v1/emails"],
@@ -335,9 +339,13 @@ describe("every write carries RequestOptions (SDK-19)", () => {
     ["posts.remove", (m) => m.posts.remove("p1", { retry: false })],
     ["posts.schedule", (m) => m.posts.schedule("p1", { scheduled_at: "x" }, { retry: false })],
     ["posts.publish", (m) => m.posts.publish("p1", { retry: false })],
-    ["gdpr.recordConsent", (m) => m.gdpr.recordConsent({ email: "a@b.co" } as never, {
-      retry: false,
-    })],
+    [
+      "gdpr.recordConsent",
+      (m) =>
+        m.gdpr.recordConsent({ email: "a@b.co" } as never, {
+          retry: false,
+        }),
+    ],
     ["webhooks.test", (m) => m.webhooks.test("wh1", { retry: false })],
   ];
 

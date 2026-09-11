@@ -1,6 +1,15 @@
 import type { PaginationOptions, TimestampInput } from "./common";
 
 /**
+ * The ISO-4217 codes a deal may carry.
+ *
+ * Closed on purpose: the API validates `currency` against exactly this list
+ * (the same one the web picker enforces), so a code outside it is a
+ * `400 VALIDATION_ERROR` rather than a stored value.
+ */
+export type DealCurrency = "USD" | "EUR" | "GBP" | "NOK";
+
+/**
  * A sponsorship or brand deal in the workspace.
  *
  * **Date fields are asymmetric.** `start_date` / `end_date` are sent as ISO
@@ -12,8 +21,14 @@ export interface Deal {
   id: string;
   title: string;
   description: string | null;
+  /**
+   * MAJOR currency units — 50000 is fifty thousand kroner, not 500. Decimals
+   * are accepted (`1999.5`). Unlike bookings, which are integer øre
+   * (`amount_ore`, `price_ore`), deals carry no minor-unit field at all, so a
+   * caller that uses both surfaces must convert: `value = amount_ore / 100`.
+   */
   value: number | null;
-  currency: string | null;
+  currency: DealCurrency | null;
   status: DealStatus;
   brand_name: string | null;
   brand_website: string | null;
@@ -68,7 +83,8 @@ export interface CreateDealInput {
   title: string;
   description?: string;
   value?: number;
-  currency?: string;
+  /** Defaults to the workspace currency when omitted. */
+  currency?: DealCurrency;
   brand_name?: string;
   brand_website?: string;
   contact_id?: string;
@@ -86,7 +102,8 @@ export interface UpdateDealInput {
   title?: string;
   description?: string;
   value?: number;
-  currency?: string;
+  /** Defaults to the workspace currency when omitted. */
+  currency?: DealCurrency;
   status?: DealStatus;
   brand_name?: string;
   brand_website?: string;

@@ -807,6 +807,53 @@ paths:
                 $ref: "#/components/schemas/ApiResponse_BookingScheduleDayArray"
         default:
           $ref: "#/components/responses/ApiError"
+  /api/v1/bookings/today:
+    get:
+      tags: [Bookings]
+      operationId: getBookingsToday
+      summary: The salon's operating summary for one local date
+      description: >-
+        Counts, the opening window, the next free gap and the day's takings
+        split by provider. `date_key` is the WORKSPACE's calendar date, so a
+        caller in another zone still reads the salon's day; omit it for today.
+        `truncated` means a source hit its read cap and the counts are floors.
+      parameters:
+        - name: date_key
+          in: query
+          description: >-
+            `yyyymmdd` in the workspace time zone. Defaults to the salon's
+            today. A non-integer is `400 VALIDATION_ERROR`.
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: The day's operating summary.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse_BookingsToday"
+        default:
+          $ref: "#/components/responses/ApiError"
+  /api/v1/bookings/attention:
+    get:
+      tags: [Bookings]
+      operationId: getBookingAttention
+      summary: Open items that need a human
+      description: >-
+        Derived on every call from facts recorded elsewhere: a failed payment,
+        a released hold, a waitlist offer about to expire, an arrangement
+        missing consent. NOT a page — `truncated` is a read budget rather than
+        a cursor, and `total` is exact only while it is false. Items carry no
+        prose: render the sentence from `kind`.
+      responses:
+        "200":
+          description: The attention feed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingAttentionFeed"
+        default:
+          $ref: "#/components/responses/ApiError"
   /api/v1/bookings/persons:
     get:
       tags: [Bookings]
@@ -838,6 +885,9 @@ paths:
       tags: [Bookings]
       operationId: createContactPerson
       summary: Add a person under a contact
+      description: >-
+        Find-or-create: `201` when a person row was inserted, `200` when an
+        existing person under the same contact answered the name match.
       requestBody:
         required: true
         content:
@@ -845,6 +895,12 @@ paths:
             schema:
               $ref: "#/components/schemas/CreateContactPersonInput"
       responses:
+        "200":
+          description: An existing person matched.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse_ContactPerson"
         "201":
           description: Created person.
           content:
@@ -950,6 +1006,82 @@ paths:
                 $ref: "#/components/schemas/ApiResponse_BookingEvent"
         default:
           $ref: "#/components/responses/ApiError"
+  /api/v1/bookings/events/hosts:
+    get:
+      tags: [Bookings]
+      operationId: listBookingEventHosts
+      summary: List arrangement hosts
+      description: >-
+        Every host, name-sorted, so a public landing page can resolve one by
+        `slug` instead of putting the host id in a URL.
+      responses:
+        "200":
+          description: The workspace's arrangement hosts.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse_BookingEventHostArray"
+        default:
+          $ref: "#/components/responses/ApiError"
+    post:
+      tags: [Bookings]
+      operationId: createBookingEventHost
+      summary: Find or create an arrangement host by name
+      description: >-
+        `201` when a host row was inserted, `200` when an existing host
+        answered the name match. A matched host is returned UNCHANGED, so a
+        corrected `address` sent here is dropped — use
+        `updateBookingEventHost` to fix one.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBookingEventHostInput"
+      responses:
+        "200":
+          description: An existing host matched the name.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse_BookingEventHost"
+        "201":
+          description: The created host.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse_BookingEventHost"
+        default:
+          $ref: "#/components/responses/ApiError"
+  /api/v1/bookings/events/hosts/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    patch:
+      tags: [Bookings]
+      operationId: updateBookingEventHost
+      summary: Correct an arrangement host
+      description: >-
+        The only write that changes an EXISTING host: the create is
+        find-or-create by name and returns a match untouched. `address: null`
+        and `note: null` erase; an omitted key leaves the stored value alone.
+        `slug` is not patchable — it is a stable public URL segment. Retiring a
+        host is `retired: true`, not a delete, because events already point at
+        it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBookingEventHostInput"
+      responses:
+        "200":
+          description: The host as it is after the change.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse_BookingEventHost"
+        default:
+          $ref: "#/components/responses/ApiError"
   /api/v1/bookings/events/{id}:
     parameters:
       - $ref: "#/components/parameters/Id"
@@ -964,6 +1096,28 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiResponse_BookingEvent"
+        default:
+          $ref: "#/components/responses/ApiError"
+    delete:
+      tags: [Bookings]
+      operationId: deleteBookingEvent
+      summary: Remove an arrangement day
+      description: >-
+        The one delete on the bookings surface — a booking is never deleted,
+        it is cancelled, which keeps the row and its money trail. OAuth
+        callers need the workspace `admin` role (`403` otherwise); a workspace
+        API key is an admin-minted credential and is not held to the floor. A
+        `completed` day is `422`; a day with any non-cancelled registration is
+        `409` — cancel those first. `mode` says whether the row itself went
+        (`hard`) or was kept as a tombstone for cancelled registrations
+        (`soft`).
+      responses:
+        "200":
+          description: The arrangement day is gone from every read.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse_BookingEventRemoveResult"
         default:
           $ref: "#/components/responses/ApiError"
   /api/v1/bookings/events/{id}/registrations:
@@ -1334,6 +1488,94 @@ paths:
                 $ref: "#/components/schemas/ApiResponse_PortalSession"
         default:
           $ref: "#/components/responses/ApiError"
+  /api/v1/portal/vipps/start:
+    post:
+      tags: [Portal]
+      operationId: startPortalVipps
+      summary: Begin a "Log in with Vipps" flow
+      description: >-
+        Returns the URL to send the customer to. `return_url` must be an
+        `https` URL under one of the workspace's own sites, or the call is
+        refused with `400 INVALID_RETURN_URL` — the allow-list is the salon's
+        site origins. `authorize_url` carries a one-time `state`, so it is
+        never cached or reused. `503 VIPPS_NOT_CONFIGURED` when this
+        deployment has no Vipps login configured.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PortalVippsStartInput"
+      responses:
+        "200":
+          description: Where to send the customer.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse_PortalVippsStart"
+        default:
+          $ref: "#/components/responses/ApiError"
+  /api/v1/portal/vipps/callback:
+    get:
+      tags: [Portal]
+      operationId: portalVippsCallback
+      summary: Vipps redirects the customer's browser here
+      description: >-
+        A PUBLIC browser navigation, not an API call: it takes no API key and
+        no SDK method wraps it. Medal validates the one-time `state`, then
+        redirects back to the `return_url` the flow started with, carrying
+        either `?grant=…` (exchange it) or `?vipps=needs_email_login` /
+        `?vipps=failed` (fall back to the e-mail code login). An unknown or
+        expired `state` answers `400` in plain text, because there is no
+        trusted return URL to send the browser to.
+      parameters:
+        - name: state
+          in: query
+          required: true
+          description: The one-time state Medal minted in `startPortalVipps`.
+          schema:
+            type: string
+        - name: code
+          in: query
+          description: Vipps' authorization code.
+          schema:
+            type: string
+      responses:
+        "302":
+          description: Redirect back to the flow's `return_url`.
+        "400":
+          description: >-
+            The state is unknown or expired, so there is no trusted return URL.
+          content:
+            text/plain:
+              schema:
+                type: string
+  /api/v1/portal/vipps/exchange:
+    post:
+      tags: [Portal]
+      operationId: exchangePortalVipps
+      summary: Exchange a Vipps login grant for a portal session
+      description: >-
+        Call this from your SERVER with the `grant` the callback appended to
+        your return URL, and keep `session_token` in an HttpOnly cookie. The
+        grant is single-use: a second exchange answers `404 GRANT_NOT_FOUND`,
+        which is also the answer for an expired grant or one minted under
+        another workspace.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PortalVippsExchangeInput"
+      responses:
+        "200":
+          description: A portal session for the signed-in contact.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse_PortalVippsSession"
+        default:
+          $ref: "#/components/responses/ApiError"
   /api/v1/portal/logout:
     parameters:
       - $ref: "#/components/parameters/PortalSession"
@@ -1685,6 +1927,53 @@ paths:
                 $ref: "#/components/schemas/ApiResponse_HelpdeskConversationUpdateResult"
         default:
           $ref: "#/components/responses/ApiError"
+  /api/v1/helpdesk/conversations/{id}/contact:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    put:
+      tags: [Helpdesk]
+      operationId: linkHelpdeskConversationContact
+      summary: Link a conversation's sender to a CRM contact
+      description: >-
+        The partner-driven half of contact linking: the partner knows which
+        external user is which customer, and Medal cannot derive it. Exactly
+        one of `contact_id` or `email`; an `email` resolves through the CRM's
+        own find-or-create. The link is stored on the SENDER, so every later
+        thread from the same external contact inherits it and
+        `conversations_updated` counts the threads it reached. Group threads
+        and channels without a stable sender answer
+        `422 CONVERSATION_NOT_LINKABLE`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LinkConversationContactInput"
+      responses:
+        "200":
+          description: The sender is linked to the contact.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse_ConversationContactLinkResult"
+        default:
+          $ref: "#/components/responses/ApiError"
+    delete:
+      tags: [Helpdesk]
+      operationId: unlinkHelpdeskConversationContact
+      summary: Unlink a conversation's sender from its CRM contact
+      description: >-
+        Reverses a mistaken link. Idempotent: a thread that carries no contact
+        answers `unlinked: false` rather than an error.
+      responses:
+        "200":
+          description: The sender carries no contact.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse_ConversationContactUnlinkResult"
+        default:
+          $ref: "#/components/responses/ApiError"
   /api/v1/helpdesk/conversations/{id}/messages:
     parameters:
       - $ref: "#/components/parameters/Id"
@@ -1953,7 +2242,7 @@ paths:
         - name: channel_type
           in: query
           schema:
-            type: string
+            $ref: "#/components/schemas/ChannelType"
         - name: status
           in: query
           schema:
@@ -2940,9 +3229,15 @@ components:
         description:
           type: [string, "null"]
         value:
+          description: >-
+            MAJOR currency units — 50000 is fifty thousand kroner, not 500.
+            Decimals are accepted. Bookings money is integer øre by contrast
+            (`amount_ore`, `price_ore`), and a deal carries no minor-unit field.
           type: [number, "null"]
         currency:
-          type: [string, "null"]
+          oneOf:
+            - $ref: "#/components/schemas/DealCurrency"
+            - type: "null"
         status:
           $ref: "#/components/schemas/DealStatus"
         brand_name:
@@ -3003,9 +3298,11 @@ components:
         description:
           type: string
         value:
+          description: >-
+            MAJOR currency units — 50000 is fifty thousand kroner, not 500.
           type: number
         currency:
-          type: string
+          $ref: "#/components/schemas/DealCurrency"
         brand_name:
           type: string
         brand_website:
@@ -3034,9 +3331,11 @@ components:
         description:
           type: string
         value:
+          description: >-
+            MAJOR currency units — 50000 is fifty thousand kroner, not 500.
           type: number
         currency:
-          type: string
+          $ref: "#/components/schemas/DealCurrency"
         status:
           $ref: "#/components/schemas/DealStatus"
         brand_name:
@@ -4379,9 +4678,7 @@ components:
       required: [channel_type]
       properties:
         channel_type:
-          type: string
-          maxLength: 64
-          description: Channel type to connect (e.g. `telegram_inbox`).
+          $ref: "#/components/schemas/ChannelType"
         label:
           type: string
           maxLength: 100
@@ -4408,7 +4705,7 @@ components:
             the create request omits it; the token can never be retrieved
             again.
         channel_type:
-          type: string
+          $ref: "#/components/schemas/ChannelType"
         label:
           type: [string, "null"]
         status:
@@ -4430,7 +4727,7 @@ components:
         id:
           type: string
         channel_type:
-          type: string
+          $ref: "#/components/schemas/ChannelType"
         label:
           type: [string, "null"]
         status:
@@ -4469,7 +4766,7 @@ components:
         id:
           type: string
         channel_type:
-          type: string
+          $ref: "#/components/schemas/ChannelType"
         label:
           type: [string, "null"]
         state:
@@ -5076,12 +5373,16 @@ components:
         - status
         - start_ts
         - end_ts
+        - start_ts_iso
+        - end_ts_iso
         - service_id
         - service_name
         - resource_id
         - resource_name
         - booked_for_name
         - amount_ore
+        - payment_mode
+        - payment_status
         - notes
         - manage_token
         - can_manage
@@ -5091,11 +5392,20 @@ components:
         status:
           $ref: "#/components/schemas/BookingStatus"
         start_ts:
+          description: >-
+            Unix timestamp in MILLISECONDS — unlike `/api/v1/bookings/*`, where
+            `start_ts` is an ISO 8601 string. Both forms are answered here: this
+            and `start_ts_iso`.
           type: integer
-          description: Unix timestamp in milliseconds.
         end_ts:
           type: integer
           description: Unix timestamp in milliseconds.
+        start_ts_iso:
+          type: string
+          format: date-time
+        end_ts_iso:
+          type: string
+          format: date-time
         service_id:
           type: [string, "null"]
         service_name:
@@ -5109,6 +5419,10 @@ components:
         amount_ore:
           type: [integer, "null"]
           description: Integer øre, or `null` when the service has no price.
+        payment_mode:
+          $ref: "#/components/schemas/BookingPaymentMode"
+        payment_status:
+          $ref: "#/components/schemas/BookingPaymentStatus"
         notes:
           type: [string, "null"]
         manage_token:
@@ -5132,7 +5446,14 @@ components:
             $ref: "#/components/schemas/PortalBooking"
     PortalConsentRecord:
       type: object
-      required: [consent_type, granted, granted_at, revoked_at, source]
+      required:
+        - consent_type
+        - granted
+        - granted_at
+        - revoked_at
+        - granted_at_iso
+        - revoked_at_iso
+        - source
       properties:
         consent_type:
           type: string
@@ -5144,6 +5465,14 @@ components:
         revoked_at:
           type: [integer, "null"]
           description: Unix timestamp in milliseconds, or `null`.
+        granted_at_iso:
+          type: [string, "null"]
+          format: date-time
+          description: ISO 8601 twin of `granted_at`.
+        revoked_at_iso:
+          type: [string, "null"]
+          format: date-time
+          description: ISO 8601 twin of `revoked_at`.
         source:
           type: string
     PortalExportRelation:
@@ -6050,3 +6379,392 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/ListBookingEventRegistrationsResult"
+    BookingRevenueProvider:
+      description: Where the money on one local day came from.
+      type: string
+      enum: [in_house, vipps]
+    BookingRevenueByProvider:
+      type: object
+      required: [provider, amount_ore, count]
+      properties:
+        provider:
+          $ref: "#/components/schemas/BookingRevenueProvider"
+        amount_ore:
+          type: integer
+          description: Integer øre.
+        count:
+          type: integer
+    BookingNextGap:
+      description: The next stretch a resource is free.
+      type: object
+      required: [resource_id, start_minute, end_minute, start_ts]
+      properties:
+        resource_id:
+          type: string
+        start_minute:
+          type: integer
+          description: Minutes since midnight in the workspace time zone.
+        end_minute:
+          type: integer
+        start_ts:
+          type: string
+          format: date-time
+    BookingsToday:
+      description: The salon's operating summary for one local date.
+      type: object
+      required:
+        - date_key
+        - time_zone
+        - opens_minute
+        - closes_minute
+        - closed_for_today
+        - next_open
+        - on_duty_count
+        - total
+        - completed
+        - remaining
+        - no_show
+        - cancelled
+        - next_gap
+        - revenue
+        - truncated
+      properties:
+        date_key:
+          type: integer
+          description: "`yyyymmdd` in the workspace time zone."
+        time_zone:
+          type: string
+          description: IANA zone the minute fields are counted in.
+        opens_minute:
+          type: [integer, "null"]
+        closes_minute:
+          type: [integer, "null"]
+        closed_for_today:
+          type: boolean
+          description: >-
+            Past the last opening window of a day that DID open. A day nobody
+            works at all is `opens_minute: null` with `on_duty_count: 0`.
+        next_open:
+          description: Set only alongside `closed_for_today`.
+          type: ["object", "null"]
+          required: [start_ts]
+          properties:
+            start_ts:
+              type: string
+              format: date-time
+        on_duty_count:
+          type: integer
+        total:
+          type: integer
+        completed:
+          type: integer
+        remaining:
+          type: integer
+        no_show:
+          type: integer
+        cancelled:
+          type: integer
+        next_gap:
+          oneOf:
+            - $ref: "#/components/schemas/BookingNextGap"
+            - type: "null"
+        revenue:
+          type: object
+          required: [total_ore, by_provider]
+          properties:
+            total_ore:
+              type: integer
+              description: Integer øre.
+            by_provider:
+              type: array
+              items:
+                $ref: "#/components/schemas/BookingRevenueByProvider"
+        truncated:
+          type: boolean
+          description: A source hit its read cap, so the counts are floors.
+    BookingAttentionKind:
+      description: What kind of open item needs a human.
+      type: string
+      enum:
+        - payment_failed
+        - payment_released
+        - payment_partial_capture
+        - waitlist_offer_expiring
+        - event_consent_missing
+        - booking_attachment
+        - no_show_today
+    BookingAttentionItem:
+      description: >-
+        One «Trenger deg» item. No prose crosses the wire — render the sentence
+        from `kind`. Absent optional fields answer `null`, so one shape
+        destructures for every kind.
+      type: object
+      required:
+        - id
+        - kind
+        - occurred_at
+        - booking_id
+        - event_id
+        - contact_id
+        - resource_id
+        - amount_ore
+        - count
+        - deadline_at
+      properties:
+        id:
+          type: string
+        kind:
+          $ref: "#/components/schemas/BookingAttentionKind"
+        occurred_at:
+          type: [string, "null"]
+          format: date-time
+        booking_id:
+          type: [string, "null"]
+        event_id:
+          type: [string, "null"]
+        contact_id:
+          type: [string, "null"]
+        resource_id:
+          type: [string, "null"]
+        amount_ore:
+          type: [integer, "null"]
+          description: Integer øre.
+        count:
+          type: [integer, "null"]
+        deadline_at:
+          type: [string, "null"]
+          format: date-time
+    BookingAttentionFeed:
+      description: >-
+        The attention feed and its own envelope. `truncated` is a read budget,
+        not a cursor; `total` is exact only while it is false.
+      type: object
+      required: [data, truncated, total]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/BookingAttentionItem"
+        truncated:
+          type: boolean
+        total:
+          type: integer
+    BookingEventHost:
+      description: A place an arrangement is held.
+      type: object
+      required: [id, name, slug, address, note, retired]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+          description: Stable public URL segment; never changes after creation.
+        address:
+          type: [string, "null"]
+        note:
+          type: [string, "null"]
+          description: The half-sentence an address cannot carry («inngang B»).
+        retired:
+          type: boolean
+    CreateBookingEventHostInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        address:
+          type: string
+          maxLength: 200
+        note:
+          type: string
+          maxLength: 200
+    UpdateBookingEventHostInput:
+      description: >-
+        At least one field. `null` erases `address`/`note`; an omitted key
+        leaves the stored value alone.
+      type: object
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        address:
+          type: [string, "null"]
+          maxLength: 200
+        note:
+          type: [string, "null"]
+          maxLength: 200
+        retired:
+          type: boolean
+    BookingEventRemoveResult:
+      type: object
+      required: [success, mode]
+      properties:
+        success:
+          type: boolean
+        mode:
+          type: string
+          enum: [hard, soft]
+          description: >-
+            `hard` when the row itself was removed, `soft` when cancelled
+            registrations still point at it and it was kept as a tombstone.
+    PortalVippsStartInput:
+      type: object
+      required: [return_url]
+      properties:
+        return_url:
+          type: string
+          maxLength: 2048
+          description: >-
+            An `https` URL under one of the workspace's own sites.
+    PortalVippsStart:
+      type: object
+      required: [authorize_url]
+      properties:
+        authorize_url:
+          type: string
+          description: >-
+            Send the customer here unchanged; it carries a one-time state.
+    PortalVippsExchangeInput:
+      type: object
+      required: [grant]
+      properties:
+        grant:
+          type: string
+          maxLength: 128
+          description: The single-use grant the callback appended to your return URL.
+    PortalVippsSession:
+      description: A portal session minted from a Vipps login.
+      type: object
+      required: [session_token, expires_at, expires_at_iso]
+      properties:
+        session_token:
+          type: string
+        expires_at:
+          type: integer
+          description: Unix timestamp in milliseconds.
+        expires_at_iso:
+          type: string
+          format: date-time
+    LinkConversationContactInput:
+      description: Exactly one of `contact_id` or `email`.
+      type: object
+      oneOf:
+        - required: [contact_id]
+        - required: [email]
+      properties:
+        contact_id:
+          type: string
+          maxLength: 64
+        email:
+          type: string
+          format: email
+          maxLength: 320
+    ConversationContactLinkResult:
+      type: object
+      required:
+        - conversation_id
+        - contact_id
+        - previous_contact_id
+        - contact_link_source
+        - contact_linked_at
+        - conversations_updated
+      properties:
+        conversation_id:
+          type: string
+        contact_id:
+          type: string
+        previous_contact_id:
+          type: [string, "null"]
+        contact_link_source:
+          type: string
+          enum: [partner]
+        contact_linked_at:
+          type: integer
+          description: Unix timestamp in milliseconds.
+        conversations_updated:
+          type: integer
+          description: >-
+            How many of this sender's threads now carry the contact — the link
+            is per sender, not per conversation.
+    ConversationContactUnlinkResult:
+      type: object
+      required: [conversation_id, unlinked, previous_contact_id, conversations_updated]
+      properties:
+        conversation_id:
+          type: string
+        unlinked:
+          type: boolean
+          description: "`false` when the thread carried no contact to begin with."
+        previous_contact_id:
+          type: [string, "null"]
+        conversations_updated:
+          type: integer
+    ApiResponse_BookingsToday:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/BookingsToday"
+    ApiResponse_BookingEventHostArray:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/BookingEventHost"
+    ApiResponse_BookingEventHost:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/BookingEventHost"
+    ApiResponse_BookingEventRemoveResult:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/BookingEventRemoveResult"
+    ApiResponse_PortalVippsStart:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/PortalVippsStart"
+    ApiResponse_PortalVippsSession:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/PortalVippsSession"
+    ApiResponse_ConversationContactLinkResult:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/ConversationContactLinkResult"
+    ApiResponse_ConversationContactUnlinkResult:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/ConversationContactUnlinkResult"
+    DealCurrency:
+      description: >-
+        ISO-4217 codes a deal may carry. Closed: the API validates `currency`
+        against exactly this list, so anything else is a 400.
+      type: string
+      enum: [USD, EUR, GBP, NOK]
+    ChannelType:
+      description: >-
+        Channel types a hosted connect link can attach. Closed: the server
+        resolves this through its connect adapter registry, which holds exactly
+        these two.
+      type: string
+      enum: [telegram_inbox, linkedin]

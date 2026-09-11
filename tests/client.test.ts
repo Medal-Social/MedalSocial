@@ -1,11 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  BaseClient,
-  createMedalClient,
-  Medal,
-  MedalApiError,
-  MedalTimeoutError,
-} from "../src";
+import { BaseClient, createMedalClient, Medal, MedalApiError, MedalTimeoutError } from "../src";
 import type { components } from "../src/openapi.generated";
 
 // Compile-time guard: the OPENAPI-DERIVED type must carry the same

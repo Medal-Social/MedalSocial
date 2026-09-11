@@ -70,7 +70,10 @@ class ChannelConnectLinks {
   }
 
   /** `delete` reads better at some call sites; identical to {@link revoke}. */
-  async delete(id: string, options?: RequestOptions): Promise<ApiResponse<ConnectLinkRevokeResult>> {
+  async delete(
+    id: string,
+    options?: RequestOptions,
+  ): Promise<ApiResponse<ConnectLinkRevokeResult>> {
     return this.revoke(id, options);
   }
 

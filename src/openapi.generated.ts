@@ -415,6 +415,46 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/bookings/today": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * The salon's operating summary for one local date
+     * @description Counts, the opening window, the next free gap and the day's takings split by provider. `date_key` is the WORKSPACE's calendar date, so a caller in another zone still reads the salon's day; omit it for today. `truncated` means a source hit its read cap and the counts are floors.
+     */
+    get: operations["getBookingsToday"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/bookings/attention": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Open items that need a human
+     * @description Derived on every call from facts recorded elsewhere: a failed payment, a released hold, a waitlist offer about to expire, an arrangement missing consent. NOT a page — `truncated` is a read budget rather than a cursor, and `total` is exact only while it is false. Items carry no prose: render the sentence from `kind`.
+     */
+    get: operations["getBookingAttention"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/bookings/persons": {
     parameters: {
       query?: never;
@@ -428,7 +468,10 @@ export interface paths {
      */
     get: operations["listContactPersons"];
     put?: never;
-    /** Add a person under a contact */
+    /**
+     * Add a person under a contact
+     * @description Find-or-create: `201` when a person row was inserted, `200` when an existing person under the same contact answered the name match.
+     */
     post: operations["createContactPerson"];
     delete?: never;
     options?: never;
@@ -475,6 +518,52 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/bookings/events/hosts": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List arrangement hosts
+     * @description Every host, name-sorted, so a public landing page can resolve one by `slug` instead of putting the host id in a URL.
+     */
+    get: operations["listBookingEventHosts"];
+    put?: never;
+    /**
+     * Find or create an arrangement host by name
+     * @description `201` when a host row was inserted, `200` when an existing host answered the name match. A matched host is returned UNCHANGED, so a corrected `address` sent here is dropped — use `updateBookingEventHost` to fix one.
+     */
+    post: operations["createBookingEventHost"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/bookings/events/hosts/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["parameters"]["Id"];
+      };
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Correct an arrangement host
+     * @description The only write that changes an EXISTING host: the create is find-or-create by name and returns a match untouched. `address: null` and `note: null` erase; an omitted key leaves the stored value alone. `slug` is not patchable — it is a stable public URL segment. Retiring a host is `retired: true`, not a delete, because events already point at it.
+     */
+    patch: operations["updateBookingEventHost"];
+    trace?: never;
+  };
   "/api/v1/bookings/events/{id}": {
     parameters: {
       query?: never;
@@ -488,7 +577,11 @@ export interface paths {
     get: operations["getBookingEvent"];
     put?: never;
     post?: never;
-    delete?: never;
+    /**
+     * Remove an arrangement day
+     * @description The one delete on the bookings surface — a booking is never deleted, it is cancelled, which keeps the row and its money trail. OAuth callers need the workspace `admin` role (`403` otherwise); a workspace API key is an admin-minted credential and is not held to the floor. A `completed` day is `422`; a day with any non-cancelled registration is `409` — cancel those first. `mode` says whether the row itself went (`hard`) or was kept as a tombstone for cancelled registrations (`soft`).
+     */
+    delete: operations["deleteBookingEvent"];
     options?: never;
     head?: never;
     patch?: never;
@@ -756,6 +849,66 @@ export interface paths {
      * @description A wrong, burned or expired code all answer `401 PORTAL_CODE_INVALID` — the three are not distinguished, so the response is not an oracle for which codes exist. The returned `session_token` is a bearer credential for ONE contact: keep it in an HttpOnly cookie on the site's server and never hand it to the browser. Not idempotency-keyed. Errors: `400 VALIDATION_ERROR`, `401 PORTAL_CODE_INVALID`, `403 FORBIDDEN`, `429 RATE_LIMITED`.
      */
     post: operations["verifyPortalLogin"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/portal/vipps/start": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Begin a "Log in with Vipps" flow
+     * @description Returns the URL to send the customer to. `return_url` must be an `https` URL under one of the workspace's own sites, or the call is refused with `400 INVALID_RETURN_URL` — the allow-list is the salon's site origins. `authorize_url` carries a one-time `state`, so it is never cached or reused. `503 VIPPS_NOT_CONFIGURED` when this deployment has no Vipps login configured.
+     */
+    post: operations["startPortalVipps"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/portal/vipps/callback": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Vipps redirects the customer's browser here
+     * @description A PUBLIC browser navigation, not an API call: it takes no API key and no SDK method wraps it. Medal validates the one-time `state`, then redirects back to the `return_url` the flow started with, carrying either `?grant=…` (exchange it) or `?vipps=needs_email_login` / `?vipps=failed` (fall back to the e-mail code login). An unknown or expired `state` answers `400` in plain text, because there is no trusted return URL to send the browser to.
+     */
+    get: operations["portalVippsCallback"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/portal/vipps/exchange": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Exchange a Vipps login grant for a portal session
+     * @description Call this from your SERVER with the `grant` the callback appended to your return URL, and keep `session_token` in an HttpOnly cookie. The grant is single-use: a second exchange answers `404 GRANT_NOT_FOUND`, which is also the answer for an expired grant or one minted under another workspace.
+     */
+    post: operations["exchangePortalVipps"];
     delete?: never;
     options?: never;
     head?: never;
@@ -1045,6 +1198,32 @@ export interface paths {
      * @description Set `status` and/or `assignee_user_id` (`null` unassigns). At least one field is required. Capability-scoped tokens must send `Idempotency-Key` and `X-Capability-Confirmation` headers on this route; API keys with legacy scopes may omit them.
      */
     patch: operations["updateHelpdeskConversation"];
+    trace?: never;
+  };
+  "/api/v1/helpdesk/conversations/{id}/contact": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["parameters"]["Id"];
+      };
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Link a conversation's sender to a CRM contact
+     * @description The partner-driven half of contact linking: the partner knows which external user is which customer, and Medal cannot derive it. Exactly one of `contact_id` or `email`; an `email` resolves through the CRM's own find-or-create. The link is stored on the SENDER, so every later thread from the same external contact inherits it and `conversations_updated` counts the threads it reached. Group threads and channels without a stable sender answer `422 CONVERSATION_NOT_LINKABLE`.
+     */
+    put: operations["linkHelpdeskConversationContact"];
+    post?: never;
+    /**
+     * Unlink a conversation's sender from its CRM contact
+     * @description Reverses a mistaken link. Idempotent: a thread that carries no contact answers `unlinked: false` rather than an error.
+     */
+    delete: operations["unlinkHelpdeskConversationContact"];
+    options?: never;
+    head?: never;
+    patch?: never;
     trace?: never;
   };
   "/api/v1/helpdesk/conversations/{id}/messages": {
@@ -1711,8 +1890,9 @@ export interface components {
       id: string;
       title: string;
       description: string | null;
+      /** @description MAJOR currency units — 50000 is fifty thousand kroner, not 500. Decimals are accepted. Bookings money is integer øre by contrast (`amount_ore`, `price_ore`), and a deal carries no minor-unit field. */
       value: number | null;
-      currency: string | null;
+      currency: components["schemas"]["DealCurrency"] | null;
       status: components["schemas"]["DealStatus"];
       brand_name: string | null;
       /** Format: uri */
@@ -1747,8 +1927,9 @@ export interface components {
     CreateDealInput: {
       title: string;
       description?: string;
+      /** @description MAJOR currency units — 50000 is fifty thousand kroner, not 500. */
       value?: number;
-      currency?: string;
+      currency?: components["schemas"]["DealCurrency"];
       brand_name?: string;
       /** Format: uri */
       brand_website?: string;
@@ -1765,8 +1946,9 @@ export interface components {
     UpdateDealInput: {
       title?: string;
       description?: string;
+      /** @description MAJOR currency units — 50000 is fifty thousand kroner, not 500. */
       value?: number;
-      currency?: string;
+      currency?: components["schemas"]["DealCurrency"];
       status?: components["schemas"]["DealStatus"];
       brand_name?: string;
       /** Format: uri */
@@ -2405,8 +2587,7 @@ export interface components {
     /** @enum {string} */
     ChannelConnectionState: "connecting" | "active" | "disconnected" | "disabled";
     CreateConnectLinkInput: {
-      /** @description Channel type to connect (e.g. `telegram_inbox`). */
-      channel_type: string;
+      channel_type: components["schemas"]["ChannelType"];
       /** @description Display label shown on the hosted connect page. */
       label?: string;
       /**
@@ -2422,7 +2603,7 @@ export interface components {
        * @description Single-use hosted connect URL containing the one-time link token — present ONLY in the live create response. An idempotent replay of the create request omits it; the token can never be retrieved again.
        */
       url?: string;
-      channel_type: string;
+      channel_type: components["schemas"]["ChannelType"];
       label: string | null;
       status: components["schemas"]["ConnectLinkStatus"];
       /** @description Unix timestamp in milliseconds. */
@@ -2430,7 +2611,7 @@ export interface components {
     };
     ConnectLink: {
       id: string;
-      channel_type: string;
+      channel_type: components["schemas"]["ChannelType"];
       label: string | null;
       status: components["schemas"]["ConnectLinkStatus"];
       /** @description Stable ref of the connection created by consuming this link, or `null`. */
@@ -2447,7 +2628,7 @@ export interface components {
     };
     ChannelConnection: {
       id: string;
-      channel_type: string;
+      channel_type: components["schemas"]["ChannelType"];
       label: string | null;
       state: components["schemas"]["ChannelConnectionState"];
       /** @description Privacy-preserving identity handle (e.g. a masked phone number). */
@@ -2735,10 +2916,14 @@ export interface components {
     PortalBooking: {
       booking_id: string;
       status: components["schemas"]["BookingStatus"];
-      /** @description Unix timestamp in milliseconds. */
+      /** @description Unix timestamp in MILLISECONDS — unlike `/api/v1/bookings/*`, where `start_ts` is an ISO 8601 string. Both forms are answered here: this and `start_ts_iso`. */
       start_ts: number;
       /** @description Unix timestamp in milliseconds. */
       end_ts: number;
+      /** Format: date-time */
+      start_ts_iso: string;
+      /** Format: date-time */
+      end_ts_iso: string;
       service_id: string | null;
       service_name: string | null;
       resource_id: string | null;
@@ -2746,6 +2931,8 @@ export interface components {
       booked_for_name: string | null;
       /** @description Integer øre, or `null` when the service has no price. */
       amount_ore: number | null;
+      payment_mode: components["schemas"]["BookingPaymentMode"];
+      payment_status: components["schemas"]["BookingPaymentStatus"];
       notes: string | null;
       /** @description Present only while the booking is upcoming and manageable; opens the site's manage page. */
       manage_token: string | null;
@@ -2762,6 +2949,16 @@ export interface components {
       granted_at: number | null;
       /** @description Unix timestamp in milliseconds, or `null`. */
       revoked_at: number | null;
+      /**
+       * Format: date-time
+       * @description ISO 8601 twin of `granted_at`.
+       */
+      granted_at_iso: string | null;
+      /**
+       * Format: date-time
+       * @description ISO 8601 twin of `revoked_at`.
+       */
+      revoked_at_iso: string | null;
       source: string;
     };
     /** @description A relation the exporting contact is a party to; only the counterpart's display name is exposed. */
@@ -3174,6 +3371,199 @@ export interface components {
     Envelope_ListBookingEventRegistrationsResult: {
       data: components["schemas"]["ListBookingEventRegistrationsResult"];
     };
+    /**
+     * @description Where the money on one local day came from.
+     * @enum {string}
+     */
+    BookingRevenueProvider: "in_house" | "vipps";
+    BookingRevenueByProvider: {
+      provider: components["schemas"]["BookingRevenueProvider"];
+      /** @description Integer øre. */
+      amount_ore: number;
+      count: number;
+    };
+    /** @description The next stretch a resource is free. */
+    BookingNextGap: {
+      resource_id: string;
+      /** @description Minutes since midnight in the workspace time zone. */
+      start_minute: number;
+      end_minute: number;
+      /** Format: date-time */
+      start_ts: string;
+    };
+    /** @description The salon's operating summary for one local date. */
+    BookingsToday: {
+      /** @description `yyyymmdd` in the workspace time zone. */
+      date_key: number;
+      /** @description IANA zone the minute fields are counted in. */
+      time_zone: string;
+      opens_minute: number | null;
+      closes_minute: number | null;
+      /** @description Past the last opening window of a day that DID open. A day nobody works at all is `opens_minute: null` with `on_duty_count: 0`. */
+      closed_for_today: boolean;
+      /** @description Set only alongside `closed_for_today`. */
+      next_open: {
+        /** Format: date-time */
+        start_ts: string;
+      } | null;
+      on_duty_count: number;
+      total: number;
+      completed: number;
+      remaining: number;
+      no_show: number;
+      cancelled: number;
+      next_gap: components["schemas"]["BookingNextGap"] | null;
+      revenue: {
+        /** @description Integer øre. */
+        total_ore: number;
+        by_provider: components["schemas"]["BookingRevenueByProvider"][];
+      };
+      /** @description A source hit its read cap, so the counts are floors. */
+      truncated: boolean;
+    };
+    /**
+     * @description What kind of open item needs a human.
+     * @enum {string}
+     */
+    BookingAttentionKind:
+      | "payment_failed"
+      | "payment_released"
+      | "payment_partial_capture"
+      | "waitlist_offer_expiring"
+      | "event_consent_missing"
+      | "booking_attachment"
+      | "no_show_today";
+    /** @description One «Trenger deg» item. No prose crosses the wire — render the sentence from `kind`. Absent optional fields answer `null`, so one shape destructures for every kind. */
+    BookingAttentionItem: {
+      id: string;
+      kind: components["schemas"]["BookingAttentionKind"];
+      /** Format: date-time */
+      occurred_at: string | null;
+      booking_id: string | null;
+      event_id: string | null;
+      contact_id: string | null;
+      resource_id: string | null;
+      /** @description Integer øre. */
+      amount_ore: number | null;
+      count: number | null;
+      /** Format: date-time */
+      deadline_at: string | null;
+    };
+    /** @description The attention feed and its own envelope. `truncated` is a read budget, not a cursor; `total` is exact only while it is false. */
+    BookingAttentionFeed: {
+      data: components["schemas"]["BookingAttentionItem"][];
+      truncated: boolean;
+      total: number;
+    };
+    /** @description A place an arrangement is held. */
+    BookingEventHost: {
+      id: string;
+      name: string;
+      /** @description Stable public URL segment; never changes after creation. */
+      slug: string;
+      address: string | null;
+      /** @description The half-sentence an address cannot carry («inngang B»). */
+      note: string | null;
+      retired: boolean;
+    };
+    CreateBookingEventHostInput: {
+      name: string;
+      address?: string;
+      note?: string;
+    };
+    /** @description At least one field. `null` erases `address`/`note`; an omitted key leaves the stored value alone. */
+    UpdateBookingEventHostInput: {
+      name?: string;
+      address?: string | null;
+      note?: string | null;
+      retired?: boolean;
+    };
+    BookingEventRemoveResult: {
+      success: boolean;
+      /**
+       * @description `hard` when the row itself was removed, `soft` when cancelled registrations still point at it and it was kept as a tombstone.
+       * @enum {string}
+       */
+      mode: "hard" | "soft";
+    };
+    PortalVippsStartInput: {
+      /** @description An `https` URL under one of the workspace's own sites. */
+      return_url: string;
+    };
+    PortalVippsStart: {
+      /** @description Send the customer here unchanged; it carries a one-time state. */
+      authorize_url: string;
+    };
+    PortalVippsExchangeInput: {
+      /** @description The single-use grant the callback appended to your return URL. */
+      grant: string;
+    };
+    /** @description A portal session minted from a Vipps login. */
+    PortalVippsSession: {
+      session_token: string;
+      /** @description Unix timestamp in milliseconds. */
+      expires_at: number;
+      /** Format: date-time */
+      expires_at_iso: string;
+    };
+    /** @description Exactly one of `contact_id` or `email`. */
+    LinkConversationContactInput: {
+      contact_id?: string;
+      /** Format: email */
+      email?: string;
+    } & (unknown | unknown);
+    ConversationContactLinkResult: {
+      conversation_id: string;
+      contact_id: string;
+      previous_contact_id: string | null;
+      /** @enum {string} */
+      contact_link_source: "partner";
+      /** @description Unix timestamp in milliseconds. */
+      contact_linked_at: number;
+      /** @description How many of this sender's threads now carry the contact — the link is per sender, not per conversation. */
+      conversations_updated: number;
+    };
+    ConversationContactUnlinkResult: {
+      conversation_id: string;
+      /** @description `false` when the thread carried no contact to begin with. */
+      unlinked: boolean;
+      previous_contact_id: string | null;
+      conversations_updated: number;
+    };
+    ApiResponse_BookingsToday: {
+      data: components["schemas"]["BookingsToday"];
+    };
+    ApiResponse_BookingEventHostArray: {
+      data: components["schemas"]["BookingEventHost"][];
+    };
+    ApiResponse_BookingEventHost: {
+      data: components["schemas"]["BookingEventHost"];
+    };
+    ApiResponse_BookingEventRemoveResult: {
+      data: components["schemas"]["BookingEventRemoveResult"];
+    };
+    ApiResponse_PortalVippsStart: {
+      data: components["schemas"]["PortalVippsStart"];
+    };
+    ApiResponse_PortalVippsSession: {
+      data: components["schemas"]["PortalVippsSession"];
+    };
+    ApiResponse_ConversationContactLinkResult: {
+      data: components["schemas"]["ConversationContactLinkResult"];
+    };
+    ApiResponse_ConversationContactUnlinkResult: {
+      data: components["schemas"]["ConversationContactUnlinkResult"];
+    };
+    /**
+     * @description ISO-4217 codes a deal may carry. Closed: the API validates `currency` against exactly this list, so anything else is a 400.
+     * @enum {string}
+     */
+    DealCurrency: "USD" | "EUR" | "GBP" | "NOK";
+    /**
+     * @description Channel types a hosted connect link can attach. Closed: the server resolves this through its connect adapter registry, which holds exactly these two.
+     * @enum {string}
+     */
+    ChannelType: "telegram_inbox" | "linkedin";
   };
   responses: {
     /** @description API error. */
@@ -4035,6 +4425,51 @@ export interface operations {
       default: components["responses"]["ApiError"];
     };
   };
+  getBookingsToday: {
+    parameters: {
+      query?: {
+        /** @description `yyyymmdd` in the workspace time zone. Defaults to the salon's today. A non-integer is `400 VALIDATION_ERROR`. */
+        date_key?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description The day's operating summary. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponse_BookingsToday"];
+        };
+      };
+      default: components["responses"]["ApiError"];
+    };
+  };
+  getBookingAttention: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description The attention feed. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["BookingAttentionFeed"];
+        };
+      };
+      default: components["responses"]["ApiError"];
+    };
+  };
   listContactPersons: {
     parameters: {
       query: {
@@ -4072,6 +4507,15 @@ export interface operations {
       };
     };
     responses: {
+      /** @description An existing person matched. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponse_ContactPerson"];
+        };
+      };
       /** @description Created person. */
       201: {
         headers: {
@@ -4186,6 +4630,88 @@ export interface operations {
       default: components["responses"]["ApiError"];
     };
   };
+  listBookingEventHosts: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description The workspace's arrangement hosts. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponse_BookingEventHostArray"];
+        };
+      };
+      default: components["responses"]["ApiError"];
+    };
+  };
+  createBookingEventHost: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CreateBookingEventHostInput"];
+      };
+    };
+    responses: {
+      /** @description An existing host matched the name. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponse_BookingEventHost"];
+        };
+      };
+      /** @description The created host. */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponse_BookingEventHost"];
+        };
+      };
+      default: components["responses"]["ApiError"];
+    };
+  };
+  updateBookingEventHost: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["parameters"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["UpdateBookingEventHostInput"];
+      };
+    };
+    responses: {
+      /** @description The host as it is after the change. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponse_BookingEventHost"];
+        };
+      };
+      default: components["responses"]["ApiError"];
+    };
+  };
   getBookingEvent: {
     parameters: {
       query?: never;
@@ -4204,6 +4730,29 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["ApiResponse_BookingEvent"];
+        };
+      };
+      default: components["responses"]["ApiError"];
+    };
+  };
+  deleteBookingEvent: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["parameters"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description The arrangement day is gone from every read. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponse_BookingEventRemoveResult"];
         };
       };
       default: components["responses"]["ApiError"];
@@ -4618,6 +5167,88 @@ export interface operations {
       default: components["responses"]["ApiError"];
     };
   };
+  startPortalVipps: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PortalVippsStartInput"];
+      };
+    };
+    responses: {
+      /** @description Where to send the customer. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponse_PortalVippsStart"];
+        };
+      };
+      default: components["responses"]["ApiError"];
+    };
+  };
+  portalVippsCallback: {
+    parameters: {
+      query: {
+        /** @description The one-time state Medal minted in `startPortalVipps`. */
+        state: string;
+        /** @description Vipps' authorization code. */
+        code?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Redirect back to the flow's `return_url`. */
+      302: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description The state is unknown or expired, so there is no trusted return URL. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "text/plain": string;
+        };
+      };
+    };
+  };
+  exchangePortalVipps: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PortalVippsExchangeInput"];
+      };
+    };
+    responses: {
+      /** @description A portal session for the signed-in contact. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponse_PortalVippsSession"];
+        };
+      };
+      default: components["responses"]["ApiError"];
+    };
+  };
   logoutPortal: {
     parameters: {
       query?: never;
@@ -5008,6 +5639,56 @@ export interface operations {
       default: components["responses"]["ApiError"];
     };
   };
+  linkHelpdeskConversationContact: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["parameters"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["LinkConversationContactInput"];
+      };
+    };
+    responses: {
+      /** @description The sender is linked to the contact. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponse_ConversationContactLinkResult"];
+        };
+      };
+      default: components["responses"]["ApiError"];
+    };
+  };
+  unlinkHelpdeskConversationContact: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: components["parameters"]["Id"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description The sender carries no contact. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponse_ConversationContactUnlinkResult"];
+        };
+      };
+      default: components["responses"]["ApiError"];
+    };
+  };
   listHelpdeskConversationMessages: {
     parameters: {
       query?: {
@@ -5266,7 +5947,7 @@ export interface operations {
         /** @description Page size (default 50, capped at 100). */
         limit?: number;
         cursor?: components["parameters"]["Cursor"];
-        channel_type?: string;
+        channel_type?: components["schemas"]["ChannelType"];
         status?: components["schemas"]["ConnectLinkStatus"];
       };
       header?: never;

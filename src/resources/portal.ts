@@ -9,6 +9,10 @@ import type {
   PortalProfilePatch,
   PortalSession,
   PortalVerifyInput,
+  PortalVippsExchangeInput,
+  PortalVippsSession,
+  PortalVippsStart,
+  PortalVippsStartInput,
 } from "../types/portal";
 
 /** The per-request options a session-bound portal call sends. */
@@ -34,7 +38,12 @@ const ONCE = { retry: false } as const;
  * `PORTAL_CODE_INVALID` — neither can duplicate anything.
  */
 class PortalLogin {
-  constructor(private client: BaseClient) {}
+  /** "Log in with Vipps" (SP8a) — `start` then `exchange`. */
+  readonly vipps: PortalVippsLogin;
+
+  constructor(private client: BaseClient) {
+    this.vipps = new PortalVippsLogin(client);
+  }
 
   /**
    * E-mail a one-time code to the address.
@@ -57,6 +66,48 @@ class PortalLogin {
    */
   async verify(input: PortalVerifyInput): Promise<ApiResponse<PortalSession>> {
     return this.client.post("/api/v1/portal/login/verify", input, ONCE);
+  }
+}
+
+/**
+ * "Log in with Vipps" (SP8a) — the two calls your server makes; the third leg
+ * is the customer's browser.
+ *
+ * 1. {@link start} with the page you want them back on, and redirect them to
+ *    `authorize_url`.
+ * 2. Vipps sends them to Medal's callback, which redirects to your `return_url`
+ *    with either `?grant=…` or `?vipps=needs_email_login` / `?vipps=failed` —
+ *    fall back to {@link PortalLogin.start} on those two.
+ * 3. {@link exchange} the grant, server-side, for a session token.
+ *
+ * `503 VIPPS_NOT_CONFIGURED` means this deployment has no Vipps login
+ * configured: the e-mail code flow is the way in.
+ */
+class PortalVippsLogin {
+  constructor(private client: BaseClient) {}
+
+  /**
+   * Begin a Vipps login and get the URL to send the customer to.
+   *
+   * `return_url` must be an `https` URL under one of the workspace's own sites
+   * (`400 INVALID_RETURN_URL` otherwise) — the allow-list is the salon's site
+   * origins, so a login cannot be bounced to somebody else's page. The answer
+   * carries a one-time `state`: never cache `authorize_url`, start again.
+   */
+  async start(input: PortalVippsStartInput): Promise<ApiResponse<PortalVippsStart>> {
+    return this.client.post("/api/v1/portal/vipps/start", input);
+  }
+
+  /**
+   * Exchange the callback's one-time `grant` for a portal session. Call this
+   * from your SERVER and keep `session_token` in an HttpOnly cookie.
+   *
+   * Sent exactly once: the grant is consumed by the first attempt, so an
+   * automatic retry would meet `404 GRANT_NOT_FOUND` and report a completed
+   * login as a failure. A 5xx surfaces as-is; start a new login.
+   */
+  async exchange(input: PortalVippsExchangeInput): Promise<ApiResponse<PortalVippsSession>> {
+    return this.client.post("/api/v1/portal/vipps/exchange", input, ONCE);
   }
 }
 

@@ -2,10 +2,13 @@ import type { BaseClient, RequestOptions } from "../client";
 import type {
   Booking,
   BookingActionResult,
+  BookingAttentionFeed,
   BookingAvailabilityOptions,
   BookingCreateResult,
   BookingEvent,
+  BookingEventHost,
   BookingEventRegistrationResult,
+  BookingEventRemoveResult,
   BookingPayment,
   BookingPaymentStart,
   BookingRescheduleResult,
@@ -15,9 +18,12 @@ import type {
   BookingService,
   BookingSlot,
   BookingsPage,
+  BookingsToday,
+  BookingsTodayOptions,
   CancelBookingInput,
   ContactPerson,
   ContactRelations,
+  CreateBookingEventHostInput,
   CreateBookingEventInput,
   CreateBookingInput,
   CreateContactPersonInput,
@@ -31,6 +37,7 @@ import type {
   RegisterBookingEventInput,
   RescheduleBookingInput,
   StartBookingPaymentInput,
+  UpdateBookingEventHostInput,
   UpdateBookingInput,
 } from "../types/bookings";
 import type { ApiResponse } from "../types/common";
@@ -226,10 +233,70 @@ class BookingsRelations {
 }
 
 /**
+ * Places an arrangement is held (D57) — a kindergarten, a clubhouse, the salon
+ * itself. The host's address is what the confirmation e-mail prints, which is
+ * why it has a route that can correct it.
+ */
+class BookingEventHosts {
+  constructor(private client: BaseClient) {}
+
+  /**
+   * Every host, name-sorted. A public landing page resolves one by `slug`, so
+   * the host id never has to appear in a URL.
+   */
+  async list(): Promise<ApiResponse<BookingEventHost[]>> {
+    return this.client.get("/api/v1/bookings/events/hosts");
+  }
+
+  /**
+   * Find-or-create a host BY NAME: `201` when a row was inserted, `200` when an
+   * existing host answered the name match.
+   *
+   * A matched host comes back UNCHANGED — a corrected `address` sent here is
+   * silently dropped, so use {@link update} to fix one.
+   *
+   * Automatically idempotent: the match is on name, so a retry cannot create a
+   * second host, and the key makes the server replay the original response
+   * rather than re-run the scan.
+   */
+  async create(
+    input: CreateBookingEventHostInput,
+    options?: RequestOptions,
+  ): Promise<ApiResponse<BookingEventHost>> {
+    return this.client.postOnce("/api/v1/bookings/events/hosts", input, options);
+  }
+
+  /**
+   * Correct a host's name, address, access note or retired flag — the only
+   * write that changes an EXISTING host over the API.
+   *
+   * `address: null` and `note: null` ERASE; an omitted key leaves the stored
+   * value alone. `slug` is not patchable: it is a stable public URL segment.
+   * Retiring is `{ retired: true }`, not a delete — events already point at it.
+   */
+  async update(
+    id: string,
+    input: UpdateBookingEventHostInput,
+    options?: RequestOptions,
+  ): Promise<ApiResponse<BookingEventHost>> {
+    return this.client.patch(
+      `/api/v1/bookings/events/hosts/${encodeURIComponent(id)}`,
+      input,
+      options,
+    );
+  }
+}
+
+/**
  * Arrangementer — scheduled group sessions bookings register against.
  */
 class BookingsEvents {
-  constructor(private client: BaseClient) {}
+  /** Places arrangementer are held. */
+  readonly hosts: BookingEventHosts;
+
+  constructor(private client: BaseClient) {
+    this.hosts = new BookingEventHosts(client);
+  }
 
   /** Arrangementer in a date range (`yyyy-mm-dd`, inclusive), optionally narrowed to one host or status. */
   async list(options: ListBookingEventsOptions): Promise<ApiResponse<BookingEvent[]>> {
@@ -294,6 +361,65 @@ class BookingsEvents {
   async registrations(id: string): Promise<ApiResponse<ListBookingEventRegistrationsResult>> {
     return this.client.get(`/api/v1/bookings/events/${encodeURIComponent(id)}/registrations`);
   }
+
+  /**
+   * Remove an arrangement DAY. The one delete on the bookings surface — a
+   * booking is never deleted, it is cancelled (`bookings.cancel`), which keeps
+   * the row and its money trail.
+   *
+   * **OAuth callers need the workspace `admin` role** (`403` otherwise): the
+   * dashboard's own action is admin-only, and an OAuth app acting for an
+   * ordinary member must not reach further through the API than that member
+   * reaches in the UI. A workspace API key is an admin-minted credential and is
+   * not held to the role floor.
+   *
+   * A `completed` day is `422`; a day with any non-cancelled registration is
+   * `409` — cancel those registrations first, which is what releases each
+   * participant's place and payment hold. Unknown, malformed, cross-workspace
+   * and already-removed ids are all the same `404`.
+   *
+   * `mode` says whether the row itself went (`hard`) or was kept as a tombstone
+   * for cancelled registrations (`soft`); either way the day is gone from every
+   * read.
+   */
+  async remove(
+    id: string,
+    options?: RequestOptions,
+  ): Promise<ApiResponse<BookingEventRemoveResult>> {
+    return this.client.delete(`/api/v1/bookings/events/${encodeURIComponent(id)}`, options);
+  }
+
+  /** `delete` reads better at some call sites; identical to {@link remove}. */
+  async delete(
+    id: string,
+    options?: RequestOptions,
+  ): Promise<ApiResponse<BookingEventRemoveResult>> {
+    return this.remove(id, options);
+  }
+}
+
+/** The bookable service catalogue. */
+class BookingServices {
+  constructor(private client: BaseClient) {}
+
+  /** List the bookable service catalogue. Active-only unless asked otherwise. */
+  async list(options?: ListBookingServicesOptions): Promise<ApiResponse<BookingService[]>> {
+    const params: Record<string, string | undefined> = {};
+    if (options?.include_inactive !== undefined) {
+      params.include_inactive = String(options.include_inactive);
+    }
+    return this.client.get("/api/v1/bookings/services", params);
+  }
+}
+
+/** The bookable resources — staff, rooms, and equipment. */
+class BookingResources {
+  constructor(private client: BaseClient) {}
+
+  /** List the bookable resources — staff, rooms, and equipment. */
+  async list(): Promise<ApiResponse<BookingResource[]>> {
+    return this.client.get("/api/v1/bookings/resources");
+  }
 }
 
 /**
@@ -332,6 +458,10 @@ export class Bookings {
   readonly events: BookingsEvents;
   /** Vipps payments on a booking, as the business. */
   readonly payment: BookingsPayment;
+  /** The bookable service catalogue — `services.list()` is `listServices()`. */
+  readonly services: BookingServices;
+  /** The bookable resources — `resources.list()` is `listResources()`. */
+  readonly resources: BookingResources;
 
   constructor(private client: BaseClient) {
     this.manage = new BookingsManage(client);
@@ -339,20 +469,45 @@ export class Bookings {
     this.relations = new BookingsRelations(client);
     this.events = new BookingsEvents(client);
     this.payment = new BookingsPayment(client);
+    this.services = new BookingServices(client);
+    this.resources = new BookingResources(client);
+  }
+
+  /**
+   * The salon's operating summary for one local date — counts, opening window,
+   * the next free gap, and the day's takings split by provider.
+   *
+   * The date is the WORKSPACE's: omit `date_key` and the workspace time zone
+   * decides which day this is, so a caller in another zone still reads the
+   * salon's Thursday.
+   */
+  async today(options?: BookingsTodayOptions): Promise<ApiResponse<BookingsToday>> {
+    const params: Record<string, string | undefined> = {};
+    if (options?.date_key !== undefined) params.date_key = String(options.date_key);
+    return this.client.get("/api/v1/bookings/today", params);
+  }
+
+  /**
+   * The open items a human has to act on — a failed payment, a released hold, a
+   * waitlist offer about to expire, an arrangement missing consent.
+   *
+   * Derived on every call, and capped: `truncated` says the list is not
+   * exhaustive and `total` is then a lower bound. It is NOT a page — there is no
+   * cursor, because a caller that hits the cap should be clearing items rather
+   * than reading further. Items carry no prose: render the sentence from `kind`.
+   */
+  async attention(): Promise<BookingAttentionFeed> {
+    return this.client.get("/api/v1/bookings/attention");
   }
 
   /** List the bookable service catalogue. Active-only unless asked otherwise. */
   async listServices(options?: ListBookingServicesOptions): Promise<ApiResponse<BookingService[]>> {
-    const params: Record<string, string | undefined> = {};
-    if (options?.include_inactive !== undefined) {
-      params.include_inactive = String(options.include_inactive);
-    }
-    return this.client.get("/api/v1/bookings/services", params);
+    return this.services.list(options);
   }
 
   /** List the bookable resources — staff, rooms, and equipment. */
   async listResources(): Promise<ApiResponse<BookingResource[]>> {
-    return this.client.get("/api/v1/bookings/resources");
+    return this.resources.list();
   }
 
   /**

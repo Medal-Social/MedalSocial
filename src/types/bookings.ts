@@ -691,3 +691,167 @@ export interface ListBookingEventRegistrationsResult {
    */
   truncated: boolean;
 }
+
+// ── Operating reads (Medal Bookings SP12) ─────────────────────
+
+/** Where the money on one local day came from. */
+export type BookingRevenueProvider = "in_house" | "vipps";
+
+/** One provider's share of a day's takings, in integer øre. */
+export interface BookingRevenueByProvider {
+  provider: BookingRevenueProvider;
+  /** Integer øre. */
+  amount_ore: number;
+  /** Bookings behind `amount_ore`. */
+  count: number;
+}
+
+/** The next stretch a resource is free, as both minutes-of-day and an instant. */
+export interface BookingNextGap {
+  resource_id: string;
+  /** Minutes since midnight in the workspace time zone. */
+  start_minute: number;
+  end_minute: number;
+  /** ISO 8601 — the same moment as `start_minute`, resolved through the salon's clock. */
+  start_ts: string;
+}
+
+/**
+ * The salon's operating summary for ONE local date — Medal's own «I dag» board
+ * over the API.
+ *
+ * The date is the WORKSPACE's, not the caller's: omit `date_key` and the
+ * workspace time zone decides which Thursday this is. `truncated` says a source
+ * hit its read cap, so the counts are floors rather than totals.
+ */
+export interface BookingsToday {
+  /** `yyyymmdd` in the workspace time zone. */
+  date_key: number;
+  /** IANA zone the minutes below are counted in, e.g. `Europe/Oslo`. */
+  time_zone: string;
+  /** Minutes since midnight the first resource comes on duty, or `null` when nobody does. */
+  opens_minute: number | null;
+  closes_minute: number | null;
+  /**
+   * Past the last opening window of a day that DID open. A day nobody works at
+   * all is `opens_minute: null` with `on_duty_count: 0` instead.
+   */
+  closed_for_today: boolean;
+  /** Set only alongside `closed_for_today` — when the salon opens again. */
+  next_open: { start_ts: string } | null;
+  on_duty_count: number;
+  total: number;
+  completed: number;
+  remaining: number;
+  no_show: number;
+  cancelled: number;
+  next_gap: BookingNextGap | null;
+  revenue: {
+    /** Integer øre. */
+    total_ore: number;
+    by_provider: BookingRevenueByProvider[];
+  };
+  /** A source stopped at its cap, so the counts above are floors. */
+  truncated: boolean;
+}
+
+/** Options for `bookings.today(...)`. */
+export interface BookingsTodayOptions {
+  /**
+   * `yyyymmdd` in the WORKSPACE time zone. Defaults to the salon's today, so a
+   * caller in another zone still reads the salon's day.
+   */
+  date_key?: number;
+}
+
+/**
+ * What kind of open item needs a human.
+ *
+ * No prose crosses the wire: the sentence is the caller's to render, so the
+ * same feed reads correctly for a salon, a vet and a consultancy.
+ */
+export type BookingAttentionKind =
+  | "payment_failed"
+  | "payment_released"
+  | "payment_partial_capture"
+  | "waitlist_offer_expiring"
+  | "event_consent_missing"
+  | "booking_attachment"
+  | "no_show_today";
+
+/**
+ * One «Trenger deg» item. Derived on every call from facts recorded elsewhere,
+ * so ids and timestamps are all it carries; every optional field answers `null`
+ * rather than being omitted, so one shape destructures for every `kind`.
+ */
+export interface BookingAttentionItem {
+  /** Stable within one answer, so a list key survives a refetch. */
+  id: string;
+  kind: BookingAttentionKind;
+  /** ISO 8601. */
+  occurred_at: string | null;
+  booking_id: string | null;
+  event_id: string | null;
+  contact_id: string | null;
+  resource_id: string | null;
+  /** Money the item is about, in integer øre. */
+  amount_ore: number | null;
+  /** How many of a thing the item is about — unconsented registrations, say. */
+  count: number | null;
+  /** ISO 8601 — when the window closes. */
+  deadline_at: string | null;
+}
+
+/**
+ * The attention feed. NOT a page: `truncated` is a read budget, not a cursor,
+ * and `total` is exact only while it is false (a lower bound otherwise).
+ */
+export interface BookingAttentionFeed {
+  data: BookingAttentionItem[];
+  truncated: boolean;
+  total: number;
+}
+
+// ── Arrangement hosts (D57) ───────────────────────────────────
+
+/** A place an arrangement is held — the address a confirmation e-mail prints. */
+export interface BookingEventHost {
+  id: string;
+  name: string;
+  /** Stable public URL segment; never changes after creation. */
+  slug: string;
+  address: string | null;
+  /** The half-sentence an address cannot carry («inngang B, ring på»). */
+  note: string | null;
+  /** `true` once the host is retired — events already pointing at it still resolve. */
+  retired: boolean;
+}
+
+/** Input for `bookings.events.hosts.create(...)` — find-or-create by name. */
+export interface CreateBookingEventHostInput {
+  /** 1–120 characters. An existing host with the same name is returned unchanged. */
+  name: string;
+  address?: string;
+  note?: string;
+}
+
+/**
+ * Input for `bookings.events.hosts.update(...)`. At least one field is required.
+ * `null` ERASES `address` / `note`; an omitted key leaves the stored value alone.
+ */
+export interface UpdateBookingEventHostInput {
+  name?: string;
+  address?: string | null;
+  note?: string | null;
+  retired?: boolean;
+}
+
+/**
+ * What removing an arrangement day reports. `hard` means the row itself is
+ * gone; `soft` means cancelled registrations still point at it and it was kept
+ * as an invisible tombstone. Either way the day is gone from every read.
+ */
+export interface BookingEventRemoveResult {
+  success: boolean;
+  mode: "hard" | "soft";
+}
