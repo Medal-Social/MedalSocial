@@ -13,6 +13,77 @@ export interface PaginatedResponse<T> {
 }
 
 /**
+ * The failure codes the Medal API throws, as `error.code` on a 4xx/5xx body.
+ *
+ * Branch on the CODE, never on `message`: the message is prose and may be
+ * reworded, the code is the contract. Kept as a union for autocomplete and
+ * paired with `(string & {})` wherever it is used, because a new code is an
+ * additive server change — treat an unknown one as a generic failure of its
+ * HTTP status rather than a bug.
+ *
+ * The list mirrors what the API's handlers actually throw (and the
+ * `x-medal-error-codes` extension in the OpenAPI document). A few are worth
+ * knowing by name:
+ *
+ * - `IDEMPOTENCY_IN_PROGRESS` — the first attempt under this key is still
+ *   running: wait and re-read, do not send a new key.
+ * - `IDEMPOTENCY_KEY_CONFLICT` — the same key was used for a DIFFERENT request.
+ * - `CAPABILITY_CONFIRMATION_REQUIRED` (428) — a capability-scoped credential
+ *   needs an `X-Capability-Confirmation`; see `autoConfirmCapabilities`.
+ * - `PORTAL_CODE_INVALID` / `PORTAL_SESSION_INVALID` — sign the customer in
+ *   again; the two are not distinguished on purpose.
+ * - `INVALID_RETURN_URL` — the URL is not under one of the workspace's sites.
+ * - `CONVERSATION_NOT_LINKABLE` — a group thread, or a channel with no stable
+ *   sender.
+ */
+export type MedalErrorCode =
+  | "AI_GENERATION_FAILED"
+  | "AI_QUOTA_EXCEEDED"
+  | "CAPABILITY_API_PATH_INVALID"
+  | "CAPABILITY_API_PATH_REQUIRED"
+  | "CAPABILITY_CONFIRMATION_REQUIRED"
+  | "CAPABILITY_NOT_API_BACKED"
+  | "CAPABILITY_NOT_CONFIRMABLE"
+  | "CAPABILITY_NOT_FOUND"
+  | "CAPABILITY_PATH_PARAM_REQUIRED"
+  | "CAPABILITY_SCOPE_DENIED"
+  | "CONFIRMATION_CONTEXT_MISMATCH"
+  | "CONFIRMATION_EXPIRED"
+  | "CONFIRMATION_INVALID"
+  | "CONFIRMATION_MALFORMED"
+  | "CONFLICT"
+  | "CONTACT_NOT_FOUND"
+  | "CONVERSATION_NOT_LINKABLE"
+  | "FORBIDDEN"
+  | "GRANT_NOT_FOUND"
+  | "IDEMPOTENCY_IN_PROGRESS"
+  | "IDEMPOTENCY_KEY_CONFLICT"
+  | "IDEMPOTENCY_KEY_REQUIRED"
+  | "INTERNAL_ERROR"
+  | "INVALID_IDEMPOTENCY_KEY"
+  | "INVALID_INPUT"
+  | "INVALID_OAUTH_RESOURCE"
+  | "INVALID_RETURN_URL"
+  | "NOT_FOUND"
+  | "PILOT_ASK_FAILED"
+  | "PORTAL_CODE_INVALID"
+  | "PORTAL_SESSION_INVALID"
+  | "PORTAL_SESSION_REQUIRED"
+  | "PREVIEW_RECEIPT_REQUIRED"
+  | "RATE_LIMITED"
+  | "SEND_FAILED"
+  | "UNAUTHORIZED"
+  | "UPSTREAM_UNAVAILABLE"
+  | "VALIDATION_ERROR"
+  | "VIPPS_NOT_CONFIGURED"
+  /** The SDK's own code for a response that carried no structured error. */
+  | "UNKNOWN_ERROR"
+  /** The deadline elapsed — see {@link MedalTimeoutError}. */
+  | "TIMEOUT"
+  /** No response was produced — see {@link MedalNetworkError}. */
+  | "NETWORK";
+
+/**
  * Base class for every failure this SDK throws.
  *
  * A call can fail three ways: the API answered with an error status
@@ -24,10 +95,17 @@ export interface PaginatedResponse<T> {
  * `code` (or `instanceof MedalApiError`) to tell them apart.
  */
 export class MedalError extends Error {
-  /** Machine-readable failure code — the API's `error.code`, or `TIMEOUT` / `NETWORK`. */
-  readonly code: string;
+  /**
+   * Machine-readable failure code — the API's `error.code`, or `TIMEOUT` /
+   * `NETWORK` for the two failures that never reach the API.
+   *
+   * Typed as the {@link MedalErrorCode} union widened with `string`, so
+   * comparing against a known code autocompletes while a code the server adds
+   * later still arrives intact rather than being a type error.
+   */
+  readonly code: MedalErrorCode | (string & {});
 
-  constructor(code: string, message: string) {
+  constructor(code: MedalErrorCode | (string & {}), message: string) {
     super(message);
     this.name = "MedalError";
     this.code = code;
@@ -62,7 +140,7 @@ export class MedalApiError extends MedalError {
 
   constructor(
     status: number,
-    code: string,
+    code: MedalErrorCode | (string & {}),
     message: string,
     details?: unknown,
     meta?: MedalApiErrorMeta,

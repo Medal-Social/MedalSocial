@@ -312,6 +312,7 @@ export type {
 export type {
   ApiResponse,
   MedalApiErrorMeta,
+  MedalErrorCode,
   PaginatedResponse,
   PaginationOptions,
   TimestampInput,

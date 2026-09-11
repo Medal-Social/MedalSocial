@@ -2453,10 +2453,61 @@ components:
           required: [code, message]
           properties:
             code:
+              description: >-
+                Machine-readable failure code. Branch on this, never on
+                `message`, which is prose and may change. The codes the API
+                throws today are listed in `x-medal-error-codes` below and
+                exported from the SDK as `MedalErrorCode`; the property stays an
+                open string because a new code is an additive server change, so
+                handle an unknown one as a generic failure of its HTTP status.
               type: string
             message:
               type: string
             details: true
+      # Deliberately an EXTENSION rather than an `enum` on `code`: closing the
+      # enum would make the document claim a completeness no client can rely on
+      # (the codes come from handler throws, not from a registry), and would make
+      # every generated client reject a code the server adds next week.
+      x-medal-error-codes:
+        - AI_GENERATION_FAILED
+        - AI_QUOTA_EXCEEDED
+        - CAPABILITY_API_PATH_INVALID
+        - CAPABILITY_API_PATH_REQUIRED
+        - CAPABILITY_CONFIRMATION_REQUIRED
+        - CAPABILITY_NOT_API_BACKED
+        - CAPABILITY_NOT_CONFIRMABLE
+        - CAPABILITY_NOT_FOUND
+        - CAPABILITY_PATH_PARAM_REQUIRED
+        - CAPABILITY_SCOPE_DENIED
+        - CONFIRMATION_CONTEXT_MISMATCH
+        - CONFIRMATION_EXPIRED
+        - CONFIRMATION_INVALID
+        - CONFIRMATION_MALFORMED
+        - CONFLICT
+        - CONTACT_NOT_FOUND
+        - CONVERSATION_NOT_LINKABLE
+        - FORBIDDEN
+        - GRANT_NOT_FOUND
+        - IDEMPOTENCY_IN_PROGRESS
+        - IDEMPOTENCY_KEY_CONFLICT
+        - IDEMPOTENCY_KEY_REQUIRED
+        - INTERNAL_ERROR
+        - INVALID_IDEMPOTENCY_KEY
+        - INVALID_INPUT
+        - INVALID_OAUTH_RESOURCE
+        - INVALID_RETURN_URL
+        - NOT_FOUND
+        - PILOT_ASK_FAILED
+        - PORTAL_CODE_INVALID
+        - PORTAL_SESSION_INVALID
+        - PORTAL_SESSION_REQUIRED
+        - PREVIEW_RECEIPT_REQUIRED
+        - RATE_LIMITED
+        - SEND_FAILED
+        - UNAUTHORIZED
+        - UPSTREAM_UNAVAILABLE
+        - VALIDATION_ERROR
+        - VIPPS_NOT_CONFIGURED
     Pagination:
       type: object
       required: [has_more, next_cursor]

@@ -104,8 +104,13 @@
     "social-media",
     "tanstack-intent"
   ],
-  "dependencies": {
+  "peerDependencies": {
     "zod": "^4.4.3"
+  },
+  "peerDependenciesMeta": {
+    "zod": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.12",
@@ -128,6 +133,7 @@
     "tsup": "^8.5.1",
     "typedoc": "^0.28.20",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.11",
+    "zod": "^4.4.3"
   }
 }

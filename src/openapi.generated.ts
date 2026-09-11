@@ -1524,6 +1524,7 @@ export interface components {
   schemas: {
     ApiError: {
       error: {
+        /** @description Machine-readable failure code. Branch on this, never on `message`, which is prose and may change. The codes the API throws today are listed in `x-medal-error-codes` below and exported from the SDK as `MedalErrorCode`; the property stays an open string because a new code is an additive server change, so handle an unknown one as a generic failure of its HTTP status. */
         code: string;
         message: string;
         details?: unknown;

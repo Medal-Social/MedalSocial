@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { MedalErrorCode } from "../src";
 import {
   BaseClient,
   backoffDelayMs,
@@ -83,6 +84,32 @@ describe("MedalApiError transport metadata (SDK-13)", () => {
       .get("/api/v1/contacts")
       .catch((e: unknown) => e);
     expect(err).toBeInstanceOf(MedalError);
+  });
+});
+
+describe("MedalErrorCode (SDK-26)", () => {
+  beforeEach(() => vi.restoreAllMocks());
+
+  it("narrows a documented code without rejecting an undocumented one", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({ error: { code: "IDEMPOTENCY_IN_PROGRESS", message: "in flight" } }),
+        { status: 409, headers: { "content-type": "application/json" } },
+      ),
+    );
+
+    const err = (await client()
+      .post("/api/v1/bookings", {}, { retry: false })
+      .catch((e: unknown) => e)) as MedalApiError;
+
+    // A documented code, compared against the union member.
+    const known: MedalErrorCode = "IDEMPOTENCY_IN_PROGRESS";
+    expect(err.code).toBe(known);
+    // And a code the server might add tomorrow still type-checks and arrives
+    // intact — the union is widened with `string` on purpose.
+    expect(new MedalApiError(400, "A_CODE_FROM_NEXT_WEEK", "x").code).toBe(
+      "A_CODE_FROM_NEXT_WEEK",
+    );
   });
 });
 
