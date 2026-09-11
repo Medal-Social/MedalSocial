@@ -199,14 +199,16 @@ describe("bookings.payment.waitForSettlement (SDK-11)", () => {
   it.each(["captured", "cancelled", "failed", "expired", "refunded"])(
     "treats %s as settled",
     async (state) => {
-      vi.spyOn(globalThis, "fetch").mockResolvedValue(mockJson(paymentPayload(state)));
+      vi.spyOn(globalThis, "fetch").mockImplementation(async () => mockJson(paymentPayload(state)));
       const payment = await medal().bookings.payment.waitForSettlement("bk_1", { intervalMs: 1 });
       expect(payment.state).toBe(state);
     },
   );
 
   it("throws once the deadline passes with the payment still unsettled", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(mockJson(paymentPayload("created")));
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
+      mockJson(paymentPayload("created")),
+    );
 
     await expect(
       medal().bookings.payment.waitForSettlement("bk_1", { intervalMs: 1, timeoutMs: 5 }),
@@ -217,7 +219,7 @@ describe("bookings.payment.waitForSettlement (SDK-11)", () => {
     // Also the only call that exercises the default interval and timeout: a
     // payment that is settled on the first read never sleeps.
     const spy = vi.spyOn(globalThis, "fetch");
-    spy.mockResolvedValue(mockJson(paymentPayload("captured")));
+    spy.mockImplementation(async () => mockJson(paymentPayload("captured")));
 
     const payment = await medal().bookings.payment.waitForSettlement("bk_1");
 
@@ -227,7 +229,7 @@ describe("bookings.payment.waitForSettlement (SDK-11)", () => {
 
   it("gives up after one poll when the budget is already exhausted", async () => {
     const spy = vi.spyOn(globalThis, "fetch");
-    spy.mockResolvedValue(mockJson(paymentPayload("created")));
+    spy.mockImplementation(async () => mockJson(paymentPayload("created")));
 
     await expect(
       medal().bookings.payment.waitForSettlement("bk_1", { intervalMs: 5, timeoutMs: 0 }),
@@ -239,7 +241,7 @@ describe("bookings.payment.waitForSettlement (SDK-11)", () => {
     // interval > remaining, so the sleep is clamped to the remaining budget and
     // the deadline has passed by the time it returns.
     const spy = vi.spyOn(globalThis, "fetch");
-    spy.mockResolvedValue(mockJson(paymentPayload("created")));
+    spy.mockImplementation(async () => mockJson(paymentPayload("created")));
 
     await expect(
       medal().bookings.payment.waitForSettlement("bk_1", { intervalMs: 500, timeoutMs: 10 }),
@@ -248,7 +250,7 @@ describe("bookings.payment.waitForSettlement (SDK-11)", () => {
   });
 
   it("surfaces a 404 rather than polling a booking with no payment", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
       mockJson({ error: { code: "NOT_FOUND", message: "No payment" } }, 404),
     );
 

@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -15,6 +15,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
  */
 const SCRIPT = "scripts/assert-openapi-sdk-coverage.mjs";
 const REAL_SPEC = "dist/openapi/medal-social.openapi.json";
+const REDOCLY_CLI = "node_modules/@redocly/cli/bin/cli.js";
+const SPEC_SOURCE = "openapi/medal-social.openapi.yaml";
 
 let dir: string;
 /** The SDK's real bundled document, used as the base for the drifted fixtures. */
@@ -47,6 +49,15 @@ function reference(extra: Record<string, unknown> = {}): Record<string, unknown>
 
 beforeAll(() => {
   dir = mkdtempSync(join(tmpdir(), "medal-parity-"));
+  // The bundled document is a build artifact, and `pnpm test` does not build.
+  // Bundle it here rather than skipping: a gate test that quietly does not run
+  // is the failure mode this whole suite exists to rule out. Any failure to
+  // produce it throws and fails the suite.
+  if (!existsSync(REAL_SPEC)) {
+    execFileSync(process.execPath, [REDOCLY_CLI, "bundle", SPEC_SOURCE, "--output", REAL_SPEC], {
+      stdio: ["ignore", "ignore", "pipe"],
+    });
+  }
   realSpec = JSON.parse(readFileSync(REAL_SPEC, "utf8"));
 });
 

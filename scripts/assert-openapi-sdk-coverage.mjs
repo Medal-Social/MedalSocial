@@ -26,6 +26,11 @@
  *   node scripts/assert-openapi-sdk-coverage.mjs \
  *     --reference-source ../../apps/web/src/lib/openapi-spec.ts \
  *     --write-reference openapi/reference/medal-api-v1-surface.json
+ *   pnpm exec biome format --write openapi/reference/medal-api-v1-surface.json
+ *
+ * The second line is not optional: the snapshot is a committed file, so
+ * `pnpm lint` formats it like any other JSON, and this script writes plain
+ * `JSON.stringify(…, 2)` with no formatter of its own.
  *
  * and run the check straight against the live document — the strongest form,
  * because it also catches a stale snapshot — with:
