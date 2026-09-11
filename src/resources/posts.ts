@@ -1,5 +1,6 @@
 import { CapabilityConfirmer } from "../capability-confirmer";
 import type { BaseClient, RequestOptions } from "../client";
+import { paginate } from "../client";
 import type { ApiResponse, PaginatedResponse } from "../types/common";
 import type {
   Channel,
@@ -42,6 +43,20 @@ export class Posts {
     if (options?.platforms) params.platforms = options.platforms.join(",");
     if (options?.query) params.query = options.query;
     return this.client.get("/api/v1/posts", params);
+  }
+
+  /**
+   * Every post the filters match, page after page.
+   *
+   * ```ts
+   * for await (const post of medal.posts.iter({ status: "published" })) …
+   * ```
+   *
+   * Drives the cursor itself off `pagination.has_more`; pages are fetched
+   * lazily, so `break` stops the walk without requesting the next one.
+   */
+  iter(options?: ListPostsOptions): AsyncGenerator<Post, void, undefined> {
+    return paginate((cursor) => this.list({ ...options, ...(cursor ? { cursor } : {}) }));
   }
 
   /**

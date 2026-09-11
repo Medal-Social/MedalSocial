@@ -197,7 +197,7 @@ export class Medal {
 
 export { CapabilityConfirmer } from "./capability-confirmer";
 export type { RequestOptions } from "./client";
-export { BaseClient, backoffDelayMs, parseRetryAfterMs } from "./client";
+export { BaseClient, backoffDelayMs, paginate, parseRetryAfterMs } from "./client";
 export type {
   components as OpenApiComponents,
   operations as OpenApiOperations,
@@ -212,7 +212,7 @@ export { Deals } from "./resources/deals";
 export { Emails } from "./resources/emails";
 export { Gdpr } from "./resources/gdpr";
 export { Helpdesk } from "./resources/helpdesk";
-export { Portal } from "./resources/portal";
+export { Portal, PortalSessionScope } from "./resources/portal";
 export { Posts } from "./resources/posts";
 export { Scan } from "./resources/scan";
 export { Webhooks } from "./resources/webhooks";
@@ -283,6 +283,7 @@ export type {
   StartBookingPaymentInput,
   UpdateBookingEventHostInput,
   UpdateBookingInput,
+  WaitForSettlementOptions,
 } from "./types/bookings";
 export type {
   AutoConfirmContext,
@@ -300,6 +301,7 @@ export type {
   ChannelConnection,
   ChannelConnectionDisconnectResult,
   ChannelConnectionState,
+  ChannelType,
   ConnectLink,
   ConnectLinkCreateResult,
   ConnectLinkRevokeResult,
@@ -342,6 +344,7 @@ export type {
   CreateDealInput,
   Deal,
   DealCreateResult,
+  DealCurrency,
   DealRemoveResult,
   DealStatus,
   DealUpdateResult,

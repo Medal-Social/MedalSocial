@@ -112,6 +112,55 @@ class PortalVippsLogin {
 }
 
 /**
+ * One customer's session, with the token already bound.
+ *
+ * `medal.portal.session(token)` exists because the flat methods take the token
+ * as their FIRST positional argument — `updateMe(session, patch)` — and a
+ * `updateMe(patch, session)` mix-up type-checks whenever both are strings. Bind
+ * once and the rest of the flow reads as what it is: `me.update({ … })`.
+ *
+ * Every method here forwards to the flat twin, so behaviour (including which
+ * calls are sent exactly once) is identical.
+ */
+export class PortalSessionScope {
+  constructor(
+    private portal: Portal,
+    /** The session token this scope is bound to. */
+    readonly token: string,
+  ) {}
+
+  /** The signed-in contact's own profile. See {@link Portal.me}. */
+  async profile(): Promise<ApiResponse<PortalProfile>> {
+    return this.portal.me(this.token);
+  }
+
+  /** Update the profile. See {@link Portal.updateMe}. */
+  async update(patch: PortalProfilePatch): Promise<ApiResponse<PortalProfile>> {
+    return this.portal.updateMe(this.token, patch);
+  }
+
+  /** The contact's bookings, split around now. See {@link Portal.myBookings}. */
+  async bookings(): Promise<ApiResponse<PortalBookings>> {
+    return this.portal.myBookings(this.token);
+  }
+
+  /** The contact's own GDPR export. See {@link Portal.exportMyData}. */
+  async export(): Promise<ApiResponse<PortalExport>> {
+    return this.portal.exportMyData(this.token);
+  }
+
+  /** Erase the contact. See {@link Portal.deleteMe}. */
+  async delete(): Promise<void> {
+    return this.portal.deleteMe(this.token);
+  }
+
+  /** Revoke the session. See {@link Portal.logout}. */
+  async logout(): Promise<void> {
+    return this.portal.logout(this.token);
+  }
+}
+
+/**
  * Customer self-service portal. The session token is a bearer credential for a
  * single contact: the calling site server must keep it in an HttpOnly cookie
  * and never hand it to the browser. Session-bound methods send it as
@@ -128,6 +177,23 @@ export class Portal {
 
   constructor(private client: BaseClient) {
     this.login = new PortalLogin(client);
+  }
+
+  /**
+   * Bind a session token once, then call the self-service methods without
+   * repeating it:
+   *
+   * ```ts
+   * const me = medal.portal.session(sessionToken);
+   * const { data: profile } = await me.profile();
+   * await me.update({ phone: "+4790000000" });
+   * ```
+   *
+   * The flat, session-first methods stay exactly as they are — this is an
+   * additive convenience, not a replacement.
+   */
+  session(token: string): PortalSessionScope {
+    return new PortalSessionScope(this, token);
   }
 
   /**

@@ -1,5 +1,6 @@
 import { CapabilityConfirmer } from "../capability-confirmer";
 import type { BaseClient, RequestOptions } from "../client";
+import { paginate } from "../client";
 import type { ApiResponse, PaginatedResponse, PaginationOptions } from "../types/common";
 import type {
   Activity,
@@ -41,6 +42,21 @@ export class Contacts {
     if (options?.search) params.search = options.search;
     if (options?.email) params.email = options.email;
     return this.client.get("/api/v1/contacts", params);
+  }
+
+  /**
+   * Every contact the filters match, page after page.
+   *
+   * ```ts
+   * for await (const contact of medal.contacts.iter({ status: "lead" })) …
+   * ```
+   *
+   * Drives the cursor itself off `pagination.has_more`, so a short page — the
+   * API applies filters WITHIN a page — does not end the walk early. Pages are
+   * fetched lazily: `break` and the next one is never requested.
+   */
+  iter(options?: ListContactsOptions): AsyncGenerator<Contact, void, undefined> {
+    return paginate((cursor) => this.list({ ...options, ...(cursor ? { cursor } : {}) }));
   }
 
   /**

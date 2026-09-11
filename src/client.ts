@@ -1,4 +1,5 @@
 import type { AutoConfirmOptions } from "./types/capabilities";
+import type { PaginatedResponse } from "./types/common";
 import { MedalApiError, MedalNetworkError, MedalTimeoutError } from "./types/common";
 
 /** Configuration for the low-level HTTP client. */
@@ -138,6 +139,41 @@ function abortReason(signal: AbortSignal): unknown {
  */
 function isNetworkFailure(error: unknown): boolean {
   return error instanceof TypeError;
+}
+
+/**
+ * Walk every page of a cursor-paginated endpoint, yielding one row at a time.
+ *
+ * ```ts
+ * for await (const contact of medal.contacts.iter({ status: "lead" })) {
+ *   await sync(contact);
+ * }
+ * ```
+ *
+ * The loop is driven off `pagination.has_more`, never off the row count — the
+ * API applies several filters WITHIN a page (helpdesk channels, connect-link
+ * status), so a page can legitimately be short or even empty while more pages
+ * remain. Stopping when the rows run out is the trap this exists to remove; the
+ * README used to print the six-line cursor loop for every caller to re-derive.
+ *
+ * A `has_more` with no `next_cursor` ends the walk rather than re-requesting
+ * page one forever.
+ *
+ * Rows are yielded lazily, one page at a time: `break` out of the loop and no
+ * further page is fetched.
+ */
+export async function* paginate<T>(
+  fetchPage: (cursor?: string) => Promise<PaginatedResponse<T>>,
+): AsyncGenerator<T, void, undefined> {
+  let cursor: string | undefined;
+  for (;;) {
+    const page = await fetchPage(cursor);
+    for (const row of page.data) yield row;
+    if (!page.pagination.has_more) return;
+    const next = page.pagination.next_cursor;
+    if (!next) return;
+    cursor = next;
+  }
 }
 
 /** Sleep, but wake early (and reject) if the caller's signal aborts. */

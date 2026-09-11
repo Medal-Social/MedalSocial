@@ -1,5 +1,6 @@
 import { CapabilityConfirmer } from "../capability-confirmer";
 import type { BaseClient, RequestOptions } from "../client";
+import { paginate } from "../client";
 import type { ApiResponse, PaginatedResponse } from "../types/common";
 import type {
   CreateDealInput,
@@ -40,6 +41,20 @@ export class Deals {
     if (options?.contact_id) params.contact_id = options.contact_id;
     if (options?.stage) params.stage = options.stage;
     return this.client.get("/api/v1/deals", params);
+  }
+
+  /**
+   * Every deal the filters match, page after page.
+   *
+   * ```ts
+   * for await (const deal of medal.deals.iter({ status: "negotiating" })) …
+   * ```
+   *
+   * Drives the cursor itself off `pagination.has_more`; pages are fetched
+   * lazily, so `break` stops the walk without requesting the next one.
+   */
+  iter(options?: ListDealsOptions): AsyncGenerator<Deal, void, undefined> {
+    return paginate((cursor) => this.list({ ...options, ...(cursor ? { cursor } : {}) }));
   }
 
   /**

@@ -855,3 +855,19 @@ export interface BookingEventRemoveResult {
   success: boolean;
   mode: "hard" | "soft";
 }
+
+/**
+ * Options for `bookings.payment.waitForSettlement(...)` and its manage-token
+ * twin.
+ */
+export interface WaitForSettlementOptions {
+  /**
+   * How long to wait between polls. Defaults to 2500 ms on the booking-id route
+   * (which shares the workspace's `apiRead` bucket) and 1000 ms on the
+   * manage-token route, which has its own `apiBookingPoll` bucket at 600/min
+   * precisely so a return page can poll while the customer is in the Vipps app.
+   */
+  intervalMs?: number;
+  /** Give up after this long. Defaults to 600000 ms (ten minutes). */
+  timeoutMs?: number;
+}

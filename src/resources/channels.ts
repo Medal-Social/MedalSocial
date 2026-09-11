@@ -1,5 +1,6 @@
 import { CapabilityConfirmer } from "../capability-confirmer";
 import type { BaseClient, RequestOptions } from "../client";
+import { paginate } from "../client";
 import type {
   ChannelConnection,
   ChannelConnectionDisconnectResult,
@@ -69,6 +70,17 @@ class ChannelConnectLinks {
     return this.client.get("/api/v1/channels/connect-links", params);
   }
 
+  /**
+   * Every connect link the filters match, page after page.
+   *
+   * The `channel_type` / `status` filters are applied WITHIN a page, so a page
+   * may hold fewer than `limit` links while `has_more` is still true — the
+   * reason this iterator exists rather than a loop over the item count.
+   */
+  iter(options?: ListConnectLinksOptions): AsyncGenerator<ConnectLink, void, undefined> {
+    return paginate((cursor) => this.list({ ...options, ...(cursor ? { cursor } : {}) }));
+  }
+
   /** `delete` reads better at some call sites; identical to {@link revoke}. */
   async delete(
     id: string,
@@ -113,6 +125,15 @@ class ChannelConnections {
     if (options?.limit !== undefined) params.limit = String(options.limit);
     if (options?.cursor) params.cursor = options.cursor;
     return this.client.get("/api/v1/channels/connections", params);
+  }
+
+  /**
+   * Every channel connection, page after page. Rows that are not projectable as
+   * connections are dropped within the page, so this walks `has_more` rather
+   * than the item count.
+   */
+  iter(options?: PaginationOptions): AsyncGenerator<ChannelConnection, void, undefined> {
+    return paginate((cursor) => this.list({ ...options, ...(cursor ? { cursor } : {}) }));
   }
 
   /**

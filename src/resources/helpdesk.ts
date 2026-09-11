@@ -1,6 +1,6 @@
 import { CapabilityConfirmer } from "../capability-confirmer";
 import type { BaseClient, RequestOptions } from "../client";
-import { resolveIdempotencyKey } from "../client";
+import { paginate, resolveIdempotencyKey } from "../client";
 import type { ApiResponse, PaginatedResponse, PaginationOptions } from "../types/common";
 import type {
   Conversation,
@@ -36,6 +36,22 @@ class HelpdeskConversations {
     if (options?.chat_type) params.chat_type = options.chat_type;
     if (options?.assigned !== undefined) params.assigned = String(options.assigned);
     return this.client.get("/api/v1/helpdesk/conversations", params);
+  }
+
+  /**
+   * Every conversation the filters match, page after page.
+   *
+   * ```ts
+   * for await (const thread of medal.helpdesk.conversations.iter({ status: "open" })) …
+   * ```
+   *
+   * This is the iterator the channel filters make necessary: they are applied
+   * WITHIN a page, so a page can hold fewer rows than `limit` — or none — while
+   * `has_more` is still true, and a hand-rolled loop that stops on an empty page
+   * silently drops the rest of the inbox.
+   */
+  iter(options?: ListConversationsOptions): AsyncGenerator<Conversation, void, undefined> {
+    return paginate((cursor) => this.list({ ...options, ...(cursor ? { cursor } : {}) }));
   }
 
   /** Get a conversation by ID. */

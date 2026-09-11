@@ -11,6 +11,7 @@ import type {
   BookingEventRemoveResult,
   BookingPayment,
   BookingPaymentStart,
+  BookingPaymentState,
   BookingRescheduleResult,
   BookingResource,
   BookingScheduleDay,
@@ -39,8 +40,78 @@ import type {
   StartBookingPaymentInput,
   UpdateBookingEventHostInput,
   UpdateBookingInput,
+  WaitForSettlementOptions,
 } from "../types/bookings";
 import type { ApiResponse } from "../types/common";
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/** Default poll gap on the booking-id route, which shares the `apiRead` bucket. */
+const SETTLEMENT_POLL_MS = 2500;
+/**
+ * Default poll gap on the manage-token route. Faster on purpose: that route has
+ * its own `apiBookingPoll` bucket (600/min) so a customer-facing return page can
+ * poll while they are still in the Vipps app.
+ */
+const MANAGE_SETTLEMENT_POLL_MS = 1000;
+/** Ten minutes — a Vipps payment expires before that, so waiting longer is waiting for nothing. */
+const SETTLEMENT_TIMEOUT_MS = 600_000;
+
+/**
+ * Payment states that will not change on their own.
+ *
+ * `authorized` counts: the money is reserved and the capture is the business's
+ * own next act, not the wallet's. `created` is the only live state — the
+ * customer has not finished in the wallet yet.
+ */
+const SETTLED_PAYMENT_STATES = new Set<BookingPaymentState>([
+  "authorized",
+  "captured",
+  "cancelled",
+  "refunded",
+  "failed",
+  "expired",
+]);
+
+/**
+ * Poll `read` until the payment reaches a state that will not change by itself.
+ *
+ * Modelled on `scan.waitForResult`: it RESOLVES for every settled state,
+ * including the unhappy ones (check `state` and `failure_code`), and throws only
+ * when the deadline passes with the payment still `created`. A 404 — the booking
+ * has no payment at all — propagates as the `MedalApiError` it is, rather than
+ * being polled as if a payment were on its way.
+ */
+async function waitForPaymentSettlement(
+  read: () => Promise<ApiResponse<BookingPayment>>,
+  label: string,
+  defaultIntervalMs: number,
+  options: WaitForSettlementOptions = {},
+): Promise<BookingPayment> {
+  const rawInterval = options.intervalMs ?? defaultIntervalMs;
+  const rawTimeout = options.timeoutMs ?? SETTLEMENT_TIMEOUT_MS;
+  // Guard against NaN, which would disable the deadline and poll forever. An
+  // explicit zero or negative timeout is preserved: one poll, then give up.
+  const intervalMs =
+    Number.isFinite(rawInterval) && rawInterval > 0 ? rawInterval : defaultIntervalMs;
+  const timeoutMs = Number.isFinite(rawTimeout) ? rawTimeout : SETTLEMENT_TIMEOUT_MS;
+  const deadline = Date.now() + timeoutMs;
+  let lastState: BookingPaymentState = "created";
+
+  for (;;) {
+    const { data } = await read();
+    if (SETTLED_PAYMENT_STATES.has(data.state)) return data;
+    lastState = data.state;
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) break;
+    await sleep(Math.min(intervalMs, remaining));
+    if (Date.now() >= deadline) break;
+  }
+
+  throw new Error(
+    `Payment for ${label} did not settle within ${timeoutMs}ms (state: ${lastState})`,
+  );
+}
 
 /**
  * Payments on a booking addressed by BOOKING ID — the business starting or
@@ -97,6 +168,34 @@ class BookingsPayment {
   async get(id: string): Promise<ApiResponse<BookingPayment>> {
     return this.client.get(`/api/v1/bookings/${encodeURIComponent(id)}/payment`);
   }
+
+  /**
+   * Poll {@link get} until the payment settles — the loop every return page had
+   * to hand-roll, including remembering that `authorized` is already an outcome
+   * and that a payment expires after ten minutes.
+   *
+   * Resolves for EVERY settled state (`authorized`, `captured`, `cancelled`,
+   * `refunded`, `failed`, `expired`), so branch on `state` and `failure_code`
+   * rather than on whether this threw. It throws only when the deadline passes
+   * with the customer still in the wallet; a 404 (no payment on the booking)
+   * propagates unchanged.
+   *
+   * @example
+   * ```ts
+   * const payment = await medal.bookings.payment.waitForSettlement(bookingId);
+   * if (payment.state !== "authorized" && payment.state !== "captured") {
+   *   return renderRetry(payment.failure_code);
+   * }
+   * ```
+   */
+  async waitForSettlement(id: string, options?: WaitForSettlementOptions): Promise<BookingPayment> {
+    return waitForPaymentSettlement(
+      () => this.get(id),
+      `booking ${id}`,
+      SETTLEMENT_POLL_MS,
+      options,
+    );
+  }
 }
 
 /**
@@ -123,6 +222,24 @@ class BookingsManagePayment {
   /** Read the payment on the customer's own booking. 404 when there is none. */
   async get(token: string): Promise<ApiResponse<BookingPayment>> {
     return this.client.get(`/api/v1/bookings/manage/${encodeURIComponent(token)}/payment`);
+  }
+
+  /**
+   * Poll the customer's own payment until it settles. See
+   * {@link BookingsPayment.waitForSettlement}; this one defaults to a 1 s gap
+   * because the manage-token poll has its own `apiBookingPoll` bucket (600/min)
+   * and cannot drain the salon's shared read quota.
+   */
+  async waitForSettlement(
+    token: string,
+    options?: WaitForSettlementOptions,
+  ): Promise<BookingPayment> {
+    return waitForPaymentSettlement(
+      () => this.get(token),
+      "the manage token",
+      MANAGE_SETTLEMENT_POLL_MS,
+      options,
+    );
   }
 }
 
@@ -547,6 +664,11 @@ export class Bookings {
    *
    * Check `pagination.truncated`: when true the read window was clipped and
    * matching bookings exist that no cursor reaches — narrow `from_ts`/`to_ts`.
+   *
+   * Deliberately has no `iter()` twin, unlike `contacts` / `deals` / `posts`:
+   * an iterator hides `pagination`, and hiding `truncated` would turn "there
+   * are bookings you cannot reach from here" into silence. Page this one by
+   * hand and read the flag.
    */
   async list(options?: ListBookingsOptions): Promise<BookingsPage> {
     const params: Record<string, string | undefined> = {};
