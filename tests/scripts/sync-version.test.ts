@@ -136,6 +136,44 @@ describe("scripts/sync-version.mjs", () => {
     expect(readFileSync(join(dir, "src", "version.ts"), "utf8")).toBe(versionTs("1.0.0"));
   });
 
+  it("only reads `version:` from inside the info block, not from a later one", async () => {
+    // The info block ends at the first dedent; a `version:` under another
+    // top-level key (here a component schema) must not be mistaken for it.
+    writeFileSync(
+      join(dir, "openapi", "medal-social.openapi.yaml"),
+      [
+        "openapi: 3.1.0",
+        "info:",
+        "  title: Medal Social API",
+        "components:",
+        "  schemas:",
+        "    Thing:",
+        "      version: 9.9.9",
+        "",
+      ].join("\n"),
+    );
+
+    const code = await runScript("--root", dir);
+
+    expect(code).toBe(1);
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("could not find a version"));
+  });
+
+  it("keeps CRLF line endings when rewriting the OpenAPI version", async () => {
+    writeFileSync(
+      join(dir, "openapi", "medal-social.openapi.yaml"),
+      YAML_HEAD.replaceAll("\n", "\r\n"),
+    );
+
+    const code = await runScript("--root", dir);
+
+    expect(code).toBeNull();
+    const yaml = readFileSync(join(dir, "openapi", "medal-social.openapi.yaml"), "utf8");
+    expect(yaml).toBe(
+      YAML_HEAD.replace("version: 1.1.7", "version: 1.11.0").replaceAll("\n", "\r\n"),
+    );
+  });
+
   it("defaults to the repository root, which is in step", async () => {
     const code = await runScript("--check");
 

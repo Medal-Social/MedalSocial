@@ -33,8 +33,17 @@ describe("version is derived from package.json everywhere", () => {
 
   it("the OpenAPI document's info.version matches", () => {
     const yaml = readFileSync(resolve(root, "openapi", "medal-social.openapi.yaml"), "utf8");
-    const match = yaml.match(/^info:\r?\n(?:[ \t]+.*\r?\n)*?[ \t]+version:[ \t]+(\S+)/m);
-    expect(match?.[1]).toBe(pkg.version);
+    // Walk the `info:` block line by line (it ends at the first dedent)
+    // instead of one multi-line regex — see scripts/sync-version.mjs for why.
+    const lines = yaml.split("\n");
+    const infoAt = lines.findIndex((line) => /^info:\s*$/.test(line));
+    expect(infoAt).toBeGreaterThanOrEqual(0);
+    const block = lines.slice(infoAt + 1);
+    const dedentAt = block.findIndex((line) => !/^[ \t]/.test(line));
+    const versionLine = block
+      .slice(0, dedentAt === -1 ? undefined : dedentAt)
+      .find((line) => /^[ \t]+version:/.test(line));
+    expect(versionLine?.trim()).toBe(`version: ${pkg.version}`);
   });
 
   it("the User-Agent header names the published version and this repository", async () => {

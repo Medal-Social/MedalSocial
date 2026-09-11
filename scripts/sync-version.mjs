@@ -67,13 +67,30 @@ const targets = [];
 }
 
 // openapi yaml — only the `version:` line inside the `info:` block is touched.
+//
+// A line walk rather than one multi-line regex: the block is delimited by
+// indentation, and expressing "any indented lines, then `version:`" as a
+// regex needs a nested quantifier (`(?:[ \t]+.*\n)*?`) whose `[ \t]+` and `.*`
+// overlap — exponential backtracking, which CodeQL flags as js/redos.
 {
   const file = resolve(root, "openapi", "medal-social.openapi.yaml");
   const raw = readFileSync(file, "utf8");
-  const pattern = /^(info:\r?\n(?:[ \t]+.*\r?\n)*?[ \t]+version:[ \t]+)(\S+)/m;
-  const match = raw.match(pattern);
-  const current = match ? match[2] : null;
-  const next = match ? raw.replace(pattern, `$1${version}`) : raw;
+  // Split on `\n` only, so a `\r` stays on its line and the join below
+  // reproduces the file's own line endings byte for byte.
+  const lines = raw.split("\n");
+  const infoAt = lines.findIndex((line) => /^info:\s*$/.test(line));
+  let current = null;
+  let next = raw;
+  for (let i = infoAt === -1 ? lines.length : infoAt + 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (!/^[ \t]/.test(line)) break; // dedent — the info block is over
+    const match = line.match(/^([ \t]+version:[ \t]+)(\S+)/);
+    if (!match) continue;
+    current = match[2];
+    lines[i] = `${match[1]}${version}${line.slice(match[0].length)}`;
+    next = lines.join("\n");
+    break;
+  }
   targets.push({ file, current, next });
 }
 
