@@ -96,8 +96,16 @@ await medal.posts.update(data.id, { content: 'Updated!' });
 await medal.posts.schedule(data.id, { scheduled_at: '2026-03-15T10:00:00Z' });
 await medal.posts.publish(data.id);
 
-// List posts
-const posts = await medal.posts.list({ status: 'draft', type: 'social', limit: 50 });
+// List posts — status is the closed PostStatus set; date filters take Unix ms or ISO 8601
+const posts = await medal.posts.list({
+  status: 'scheduled',
+  type: 'social',
+  platforms: ['linkedin', 'x'],
+  scheduled_from: '2026-07-01T00:00:00Z',
+  scheduled_to: Date.now() + 7 * 86_400_000,
+  query: 'launch',
+  limit: 50,
+});
 
 // Delete
 await medal.posts.remove(data.id);
@@ -159,7 +167,7 @@ const { data: updated } = await medal.contacts.update(created.id, { status: 'cus
 const { data: removed } = await medal.contacts.remove(created.id);
 console.log(updated.success, removed.success);
 
-// List with filters
+// List with filters — status is 'lead' | 'subscriber' | 'customer' | 'churned'
 const contacts = await medal.contacts.list({
   status: 'lead',
   email_status: 'subscribed',
@@ -167,6 +175,9 @@ const contacts = await medal.contacts.list({
   search: 'john',
   limit: 50,
 });
+
+// "The contact for this e-mail": exact match, not a fuzzy search
+const { data: [byEmail] } = await medal.contacts.list({ email: 'john@example.com' });
 
 // Activity timeline
 const activities = await medal.contacts.activities('contact_id', { limit: 20 });
@@ -196,13 +207,23 @@ const { data: created } = await medal.deals.create({
 });
 const { data: deal } = await medal.deals.get(created.id);
 
-const { data: updated } = await medal.deals.update(deal.id, { status: 'won' });
+// Move it along the pipeline: draft → negotiating → offer_sent → signed → completed | declined
+const { data: updated } = await medal.deals.update(deal.id, { status: 'signed' });
 const { data: unlinked } = await medal.deals.update(deal.id, { contact_id: null }); // unlink contact
 
-const deals = await medal.deals.list({ status: 'open', search: 'Acme' });
+const deals = await medal.deals.list({
+  status: 'negotiating',
+  search: 'Acme',
+  contact_id: 'c_123',
+  min_value: 25000,
+  close_date_from: '2026-07-01T00:00:00Z', // Unix ms or ISO 8601
+  close_date_to: Date.now() + 30 * 86_400_000,
+});
 const { data: removed } = await medal.deals.remove(deal.id);
 console.log(updated.success, unlinked.success, removed.success);
 ```
+
+A deal always starts at `draft`; `status` is only accepted on `update`, and only the six values above — anything else is a `400`. **Dates are asymmetric:** `start_date` / `end_date` are *sent* as ISO 8601 (or `YYYY-MM-DD`) strings but come *back* as Unix milliseconds (`number | null`), so `new Date(deal.end_date)` is the right call on the way out.
 
 ### Bookings
 
@@ -250,6 +271,8 @@ await medal.bookings.markNoShow(moved.booking_id);
 // Listing — check `truncated`: when true, matching bookings exist that no
 // cursor reaches, so narrow the from_ts/to_ts window
 const page = await medal.bookings.list({ status: 'confirmed', from_ts: Date.now(), limit: 50 });
+// "How many bookings did our website bring in?" — created_via filters the WHOLE column
+const fromSite = await medal.bookings.list({ created_via: 'web', from_ts: monthStart, to_ts: monthEnd });
 console.log(page.pagination.has_more, page.pagination.next_cursor, page.pagination.truncated);
 ```
 
@@ -351,7 +374,8 @@ The session token is a **bearer credential for one contact**. Your site's server
 ```ts
 // 1. Send the code. Always { status: 'sent' } — enumeration-safe, so "sent" does
 //    not confirm the address belongs to a contact.
-await medal.portal.login.start({ email: 'ida@example.com', locale: 'nb' });
+//    locale is 'no' | 'en' — the API refuses 'nb' with a 400.
+await medal.portal.login.start({ email: 'ida@example.com', locale: 'no' });
 
 // 2. Exchange the code the customer typed. Wrong, burned and expired codes all
 //    answer 401 PORTAL_CODE_INVALID.
@@ -445,9 +469,14 @@ const conversations = await medal.helpdesk.conversations.list({
   assignee_user_id: 'user_1',
   requester: 'jane@example.com',     // match visitor name/email
   query: 'refund',                   // free-text search
-  channels: ['widget', 'whatsapp'],  // channel filter
+  channels: ['widget', 'whatsapp'],  // channel filter (the closed HelpdeskChannel set)
   limit: 50,
 });
+
+// Triage: what has nobody picked up yet? `assigned: false` is the question
+// `assignee_user_id` cannot ask; `chat_type` narrows personal-account
+// channels (Telegram) to DMs, groups or broadcast channels.
+const unowned = await medal.helpdesk.conversations.list({ assigned: false, chat_type: 'group' });
 
 // Read one conversation + its messages
 const { data: conversation } = await medal.helpdesk.conversations.get('conv_id');
@@ -482,6 +511,8 @@ for (const message of messages) {
 
 Subscribe to `helpdesk.message_delivery_updated` for the same values pushed instead of polled.
 
+**Upstream deletions.** When the customer deletes a message on the external channel (Telegram today), the message is kept as a *tombstone* so the thread still reads in order: `externally_deleted_at` carries the Unix-ms timestamp of the deletion, `body` is empty and any attachment has been erased. Mirror the deletion in your own store rather than treating it as a blank message; the push-side signal is the `helpdesk.message_deleted` webhook event, whose payload deliberately carries an empty body too.
+
 ### Webhooks
 
 ```ts
@@ -491,6 +522,7 @@ const { data: endpoint } = await medal.webhooks.create(
   {
     name: 'Helpdesk bridge',
     url: 'https://example.com/medal/webhook', // must be https
+    // Typed as SubscribableWebhookEventType[] — a typo is a compile error, not a runtime 400
     event_types: ['helpdesk.message_received', 'helpdesk.conversation_status_changed'],
     channels: ['widget'],                     // optional channel filter
   },
@@ -803,7 +835,7 @@ pnpm openapi:check
 
 ## Runtime Support
 
-Node.js 24+ (see `engines.node`) and modern browsers. Uses native `fetch` — no polyfills required.
+Node.js 22+ (see `engines.node`; the unit suite runs on 22 and 24 in CI) and modern browsers. Uses native `fetch` — no polyfills required. The client itself only needs `fetch`, `AbortController`, `WritableStream` and Web Crypto, but Node 20 reached end-of-life in April 2026 and the SDK's own toolchain (pnpm 11, `changesets`, `secretlint`, `lint-staged`) needs 22.13+, so 22 is the floor the SDK certifies.
 
 The individual helpers only need Web Crypto and `fetch`, so they also run on Deno, Bun and Cloudflare Workers.
 

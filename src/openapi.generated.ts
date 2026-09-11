@@ -1365,7 +1365,7 @@ export interface components {
       type: components["schemas"]["PostType"];
       title: string | null;
       content: string;
-      status: string;
+      status: components["schemas"]["PostStatus"];
       channel_ids: string[];
       variant_count: number;
       published_count: number;
@@ -1381,11 +1381,34 @@ export interface components {
     };
     /** @enum {string} */
     PostType: "social" | "newsletter" | "blog";
+    /**
+     * @description Lifecycle status of a post. `partial` = some variants published and some failed; `unpublished` = every published variant was taken down.
+     * @enum {string}
+     */
+    PostStatus:
+      | "draft"
+      | "review"
+      | "approved"
+      | "scheduled"
+      | "publishing"
+      | "published"
+      | "failed"
+      | "partial"
+      | "unpublished";
+    /** @enum {string} */
+    PostVariantStatus:
+      | "pending"
+      | "scheduled"
+      | "publishing"
+      | "published"
+      | "failed"
+      | "unpublishing"
+      | "unpublished";
     PostVariant: {
       id: string;
       channel_id: string;
       content: string;
-      status: string;
+      status: components["schemas"]["PostVariantStatus"];
       platform: string | null;
       channel_display_name: string | null;
       /** Format: date-time */
@@ -1455,9 +1478,25 @@ export interface components {
       contact_id: string | null;
       status: string;
     };
+    /**
+     * @description Delivery lifecycle of a sent email. `queued` is what a fresh send reports; `opened` / `clicked` come from the tracker; `bounced`, `complained`, `failed` and `cancelled` are terminal.
+     * @enum {string}
+     */
+    EmailSendStatus:
+      | "pending"
+      | "queued"
+      | "sending"
+      | "sent"
+      | "delivered"
+      | "opened"
+      | "clicked"
+      | "bounced"
+      | "complained"
+      | "failed"
+      | "cancelled";
     EmailSend: {
       id: string;
-      status: string;
+      status: components["schemas"]["EmailSendStatus"];
       /** Format: email */
       recipient_email: string;
       recipient_name: string | null;
@@ -1555,9 +1594,7 @@ export interface components {
       phone: string | null;
       company: string | null;
       job_title: string | null;
-      address: {
-        [key: string]: string;
-      } | null;
+      address: components["schemas"]["ContactAddress"] | null;
       status: components["schemas"]["ContactStatus"];
       email_status: components["schemas"]["EmailStatus"];
       label_ids: string[];
@@ -1585,9 +1622,17 @@ export interface components {
       id: string;
     };
     /** @enum {string} */
-    ContactStatus: "lead" | "prospect" | "customer" | "churned" | "archived";
+    ContactStatus: "lead" | "subscriber" | "customer" | "churned";
     /** @enum {string} */
     EmailStatus: "subscribed" | "unsubscribed" | "bounced" | "complained";
+    /** @description A contact's postal address. Keys are camelCase (`postalCode`) — the one object in /api/v1 that is not snake_case — and closed: any other key is a 400 VALIDATION_ERROR. */
+    ContactAddress: {
+      street?: string;
+      city?: string;
+      state?: string;
+      postalCode?: string;
+      country?: string;
+    };
     CreateContactInput: {
       /** Format: email */
       email: string;
@@ -1596,9 +1641,7 @@ export interface components {
       phone?: string;
       company?: string;
       job_title?: string;
-      address?: {
-        [key: string]: string;
-      };
+      address?: components["schemas"]["ContactAddress"];
       status?: components["schemas"]["ContactStatus"];
       email_status?: components["schemas"]["EmailStatus"];
       label_ids?: string[];
@@ -1643,7 +1686,7 @@ export interface components {
       company?: string;
       job_title?: string;
       label_ids?: string[];
-      status?: string;
+      status?: components["schemas"]["ContactStatus"];
     };
     ImportContactsResult: {
       added: number;
@@ -1678,10 +1721,10 @@ export interface components {
       contact_name: string | null;
       /** Format: email */
       contact_email: string | null;
-      /** Format: date */
-      start_date: string | null;
-      /** Format: date */
-      end_date: string | null;
+      /** @description Unix timestamp in milliseconds. Sent as a date string, returned as ms. */
+      start_date: number | null;
+      /** @description Unix timestamp in milliseconds. Sent as a date string, returned as ms. */
+      end_date: number | null;
       notes: string | null;
       /** Format: date-time */
       created_at: string | null;
@@ -1700,15 +1743,7 @@ export interface components {
       success: true;
     };
     /** @enum {string} */
-    DealStatus:
-      | "draft"
-      | "open"
-      | "won"
-      | "lost"
-      | "negotiating"
-      | "proposal_sent"
-      | "on_hold"
-      | "churned";
+    DealStatus: "draft" | "negotiating" | "offer_sent" | "signed" | "completed" | "declined";
     CreateDealInput: {
       title: string;
       description?: string;
@@ -1746,6 +1781,8 @@ export interface components {
       end_date?: string;
       notes?: string;
     };
+    /** @description A timestamp on the way in to a list filter — Unix milliseconds, or an ISO 8601 date-time string. Anything else is a 400 VALIDATION_ERROR. */
+    TimestampInput: number | string;
     /** @description A timestamp on the way in — Unix milliseconds, or an ISO 8601 date-time string. Responses always render timestamps as ISO 8601. */
     BookingTimestampInput: number | string;
     /** @enum {string} */
@@ -2144,6 +2181,32 @@ export interface components {
     };
     /** @enum {string} */
     HelpdeskConversationStatus: "open" | "snoozed" | "closed";
+    /**
+     * @description Channel a conversation lives on. The same set is accepted by the `channels` filters on conversation listing and webhook endpoints.
+     * @enum {string}
+     */
+    HelpdeskChannel:
+      | "widget"
+      | "instagram"
+      | "messenger"
+      | "whatsapp"
+      | "twitter"
+      | "email"
+      | "linkedin_dm"
+      | "digipost"
+      | "finn"
+      | "trustpilot"
+      | "telegram";
+    /**
+     * @description Kind of chat on a personal-account channel (Telegram today): a direct message, a group, or a broadcast channel.
+     * @enum {string}
+     */
+    HelpdeskChatType: "private" | "group" | "channel";
+    /**
+     * @description How a conversation's CRM contact was attached: `identity` (the widget visitor's e-mail), `operator` (a member linked it in the inbox) or `partner` (posted through the REST API).
+     * @enum {string}
+     */
+    HelpdeskContactLinkSource: "identity" | "operator" | "partner";
     /** @enum {string} */
     HelpdeskMessageAuthorType: "visitor" | "operator" | "ai" | "system";
     /**
@@ -2153,17 +2216,24 @@ export interface components {
     HelpdeskMessageType: "chat" | "email" | "note";
     HelpdeskConversation: {
       id: string;
-      /** @description Channel type, e.g. `widget`, `instagram`, `messenger`, `whatsapp`, `email`. */
-      channel: string;
+      channel: components["schemas"]["HelpdeskChannel"];
       channel_connection_id: string | null;
       status: components["schemas"]["HelpdeskConversationStatus"];
       subject: string | null;
       assignee_user_id: string | null;
       contact_id: string | null;
+      /** @description How `contact_id` was attached, or `null` when the thread carries no contact. */
+      contact_link_source: components["schemas"]["HelpdeskContactLinkSource"] | null;
+      /** @description Unix timestamp in milliseconds when the contact was attached, or `null`. */
+      contact_linked_at: number | null;
       visitor_name: string | null;
       visitor_email: string | null;
       external_conversation_id: string | null;
       channel_account_id: string | null;
+      /** @description DM / group / channel on personal-account channels; `null` elsewhere. */
+      chat_type: components["schemas"]["HelpdeskChatType"] | null;
+      /** @description The external group or channel title; `null` for DMs and business channels. */
+      chat_title: string | null;
       message_count: number;
       unread_for_operator: number;
       /** @description Unix timestamp in milliseconds. */
@@ -2187,6 +2257,8 @@ export interface components {
       delivery_status: components["schemas"]["HelpdeskMessageDeliveryStatus"] | null;
       /** @description Last send error for a `failed` outbound message, otherwise `null`. */
       delivery_error: string | null;
+      /** @description Unix timestamp in milliseconds when the customer deleted the message on the external channel (Telegram today), otherwise `null`. The message is kept as a tombstone so the thread still reads in order, but its `body` is empty and any attachment has been erased — mirror the deletion in your own store. Also delivered as the `helpdesk.message_deleted` webhook event. */
+      externally_deleted_at: number | null;
       /** @description Unix timestamp in milliseconds. */
       created_at: number;
     };
@@ -2220,6 +2292,22 @@ export interface components {
       /** @constant */
       status: "created";
     };
+    /**
+     * @description The event types an endpoint can subscribe to — every delivery type except `test.ping`, which is only ever queued by the test route. Any other string in `event_types` is a 400.
+     * @enum {string}
+     */
+    WebhookSubscribableEventType:
+      | "helpdesk.conversation_created"
+      | "helpdesk.conversation_assigned"
+      | "helpdesk.conversation_status_changed"
+      | "helpdesk.message_received"
+      | "helpdesk.message_sent"
+      | "helpdesk.message_delivery_updated"
+      | "helpdesk.message_deleted"
+      | "helpdesk.conversation_contact_linked"
+      | "helpdesk.conversation_contact_unlinked"
+      | "helpdesk.channel_connected"
+      | "helpdesk.channel_disconnected";
     WebhookEndpoint: {
       id: string;
       name: string;
@@ -2230,9 +2318,9 @@ export interface components {
       url: string;
       enabled: boolean;
       /** @description Subscribed event types. Empty array = all events. */
-      event_types: string[];
+      event_types: components["schemas"]["WebhookSubscribableEventType"][];
       /** @description Channel-type filter (e.g. `['widget', 'whatsapp']`), or `null` for all channels. */
-      channels: string[] | null;
+      channels: components["schemas"]["HelpdeskChannel"][] | null;
       /** @description Channel-connection filter, or `null` for all connections. */
       channel_connection_ids: string[] | null;
       /** @description Last 4 characters of the signing secret, for identification. */
@@ -2259,10 +2347,10 @@ export interface components {
        * @description Destination URL — must be https.
        */
       url: string;
-      /** @description Event types to subscribe to (e.g. `helpdesk.message_received`). Empty = all. */
-      event_types: string[];
-      /** @description Restrict to these channel types (e.g. `['widget', 'whatsapp']`). */
-      channels?: string[];
+      /** @description Event types to subscribe to (e.g. `helpdesk.message_received`). Empty = all; an unknown type is a 400. */
+      event_types: components["schemas"]["WebhookSubscribableEventType"][];
+      /** @description Restrict to these channel types (e.g. `['widget', 'whatsapp']`); an unknown channel is a 400. */
+      channels?: components["schemas"]["HelpdeskChannel"][];
       /** @description Restrict to these channel connection IDs. */
       channel_connection_ids?: string[];
     };
@@ -2271,9 +2359,9 @@ export interface components {
       name?: string;
       /** Format: uri */
       url?: string;
-      event_types?: string[];
+      event_types?: components["schemas"]["WebhookSubscribableEventType"][];
       /** @description New channel-type filter, or `null` to clear the filter. */
-      channels?: string[] | null;
+      channels?: components["schemas"]["HelpdeskChannel"][] | null;
       /** @description New channel-connection filter, or `null` to clear the filter. */
       channel_connection_ids?: string[] | null;
       enabled?: boolean;
@@ -2565,14 +2653,18 @@ export interface components {
     Envelope_ManageSummary: {
       data: components["schemas"]["ManageSummary"];
     };
+    /**
+     * @description Locale of the one-time-code e-mail. Exactly these two are accepted — `nb`, `nn` and every other spelling of Norwegian are a 400.
+     * @enum {string}
+     */
+    PortalLocale: "no" | "en";
     PortalLoginStartInput: {
       /**
        * Format: email
        * @description The address the code is sent to.
        */
       email: string;
-      /** @description Locale for the e-mail (e.g. `nb`, `en`); the workspace default when omitted. */
-      locale?: string;
+      locale?: components["schemas"]["PortalLocale"];
     };
     /** @description Always `sent`, whether or not the address is a known contact — the route is enumeration-safe by design. */
     PortalLoginStartResult: {
@@ -3115,8 +3207,20 @@ export interface operations {
       query?: {
         limit?: components["parameters"]["Limit"];
         cursor?: components["parameters"]["Cursor"];
-        status?: string;
+        status?: components["schemas"]["PostStatus"];
         type?: components["schemas"]["PostType"];
+        /** @description Inclusive lower bound on `scheduled_at`. */
+        scheduled_from?: components["schemas"]["TimestampInput"];
+        /** @description Inclusive upper bound on `scheduled_at`. */
+        scheduled_to?: components["schemas"]["TimestampInput"];
+        /** @description Inclusive lower bound on `published_at`. */
+        published_from?: components["schemas"]["TimestampInput"];
+        /** @description Inclusive upper bound on `published_at`. */
+        published_to?: components["schemas"]["TimestampInput"];
+        /** @description Comma-separated target platforms (e.g. `linkedin,x`). */
+        platforms?: string;
+        /** @description Free-text search across title and content. */
+        query?: string;
       };
       header?: never;
       path?: never;
@@ -3434,7 +3538,10 @@ export interface operations {
         email_status?: components["schemas"]["EmailStatus"];
         /** @description Comma-separated label IDs. */
         label_ids?: string;
+        /** @description Free-text search across name, email and company. */
         search?: string;
+        /** @description Exact-match on the contact's email address. */
+        email?: string;
       };
       header?: never;
       path?: never;
@@ -3639,6 +3746,18 @@ export interface operations {
         cursor?: components["parameters"]["Cursor"];
         status?: components["schemas"]["DealStatus"];
         search?: string;
+        /** @description Inclusive lower bound on the deal's close (`end_date`). */
+        close_date_from?: components["schemas"]["TimestampInput"];
+        /** @description Inclusive upper bound on the deal's close (`end_date`). */
+        close_date_to?: components["schemas"]["TimestampInput"];
+        /** @description Only deals worth at least this much. */
+        min_value?: number;
+        /** @description Case-insensitive contains match against the brand / company name. */
+        company_name?: string;
+        /** @description Only deals linked to this contact. */
+        contact_id?: string;
+        /** @description Case-insensitive stage label match (e.g. `offer sent`). */
+        stage?: string;
       };
       header?: never;
       path?: never;
@@ -3767,6 +3886,8 @@ export interface operations {
         to_ts?: components["schemas"]["BookingTimestampInput"];
         status?: components["schemas"]["BookingStatus"];
         resource_id?: string;
+        /** @description Only bookings with this provenance. Every value the column holds is filterable here, unlike the create body's allowlist; any other value is a 400. */
+        created_via?: components["schemas"]["BookingCreatedVia"];
       };
       header?: never;
       path?: never;
@@ -4814,6 +4935,10 @@ export interface operations {
         query?: string;
         /** @description Comma-separated channel types (e.g. `widget,whatsapp`). */
         channels?: string;
+        /** @description Only conversations of this chat kind on personal-account channels; conversations without a chat type never match. */
+        chat_type?: components["schemas"]["HelpdeskChatType"];
+        /** @description `false` = only conversations nobody owns yet, `true` = only owned ones. Only the exact strings `true` / `false` are accepted. */
+        assigned?: boolean;
       };
       header?: never;
       path?: never;

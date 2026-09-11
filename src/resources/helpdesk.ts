@@ -29,6 +29,8 @@ class HelpdeskConversations {
     if (options?.requester) params.requester = options.requester;
     if (options?.query) params.query = options.query;
     if (options?.channels) params.channels = options.channels.join(",");
+    if (options?.chat_type) params.chat_type = options.chat_type;
+    if (options?.assigned !== undefined) params.assigned = String(options.assigned);
     return this.client.get("/api/v1/helpdesk/conversations", params);
   }
 

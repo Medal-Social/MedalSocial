@@ -28,6 +28,7 @@ export class Contacts {
     if (options?.email_status) params.email_status = options.email_status;
     if (options?.label_ids) params.label_ids = options.label_ids.join(",");
     if (options?.search) params.search = options.search;
+    if (options?.email) params.email = options.email;
     return this.client.get("/api/v1/contacts", params);
   }
 

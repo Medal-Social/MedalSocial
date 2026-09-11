@@ -1,13 +1,13 @@
 ---
 name: resources
-description: Use when calling any of the SDK resources (bookings, contacts, deals, emails, gdpr, portal, posts, scan, workspaces) — listing with pagination, sending transactional or batch emails, scheduling and publishing posts, booking appointments or querying free slots, cancelling or rescheduling a booking as staff or on a customer's behalf, signing a customer into the self-service portal and reading their own profile/bookings/export, recording GDPR consent or running an export workflow, fetching a contact's activity timeline — or when needing OpenAPI-derived TypeScript types or the raw OpenAPI document from `@medalsocial/sdk`.
+description: Use when calling any of the SDK resources (bookings, channels, contacts, deals, emails, gdpr, helpdesk, portal, posts, scan, webhooks, capabilityConfirmations, workspaces) — listing with pagination and filters, sending transactional or batch emails, scheduling and publishing posts, booking appointments or querying free slots, cancelling or rescheduling a booking as staff or on a customer's behalf, signing a customer into the self-service portal and reading their own profile/bookings/export, reading and replying to helpdesk conversations, registering webhook endpoints, connecting partner channels, recording GDPR consent or running an export workflow, fetching a contact's activity timeline — or when needing OpenAPI-derived TypeScript types or the raw OpenAPI document from `@medalsocial/sdk`.
 ---
 
 # Medal Social SDK — Resources
 
 ## When to load this skill
 
-- Calling `medal.bookings.*`, `medal.contacts.*`, `medal.deals.*`, `medal.emails.*`, `medal.gdpr.*`, `medal.portal.*`, `medal.posts.*`, `medal.scan.*`, or `medal.workspaces.*`.
+- Calling `medal.bookings.*`, `medal.channels.*`, `medal.contacts.*`, `medal.deals.*`, `medal.emails.*`, `medal.gdpr.*`, `medal.helpdesk.*`, `medal.portal.*`, `medal.posts.*`, `medal.scan.*`, `medal.webhooks.*`, `medal.capabilityConfirmations.*`, or `medal.workspaces.*`.
 - Looking up an exact method signature or response shape.
 - Building a list view that needs pagination.
 - Sending a single transactional email or a bulk batch.
@@ -52,9 +52,17 @@ Errors throw `MedalApiError` (see the `client` skill for details).
 | `medal.portal` | `src/resources/portal.ts` | `me(session)`, `updateMe(session, patch)`, `myBookings(session)`, `exportMyData(session)`, `deleteMe(session)`, `logout(session)` — every one takes the `session_token` first and sends it as `X-Portal-Session`; `deleteMe`/`logout` resolve to `undefined` (204) |
 | `medal.scan` | `src/resources/scan.ts` | `create(input)` (exactly one of `url`/`orgnr`/`name`; 202 async job), `get(id)`, `companies(q)` (Norwegian registry typeahead), `waitForResult(id, opts?)` (polls until done/failed; returns the job either way, throws only on deadline) |
 | `medal.posts` | `src/resources/posts.ts` | `list(opts?)`, `create(input)`, `get(id)`, `update(id, input)`, `remove(id)`, `schedule(id, input)`, `publish(id)`, `channels()` |
+| `medal.helpdesk.conversations` | `src/resources/helpdesk.ts` (`HelpdeskConversations`) | `list(opts?)` (filters: `status`, `assignee_user_id`, `assigned`, `requester`, `query`, `channels`, `chat_type`), `get(id)`, `update(id, input, opts?)` (status / assignee; confirmable write), `messages(id, opts?)` |
+| `medal.helpdesk.replies` | `src/resources/helpdesk.ts` (`HelpdeskReplies`) | `create(input, opts?)` — operator reply or internal `note`; 201 = accepted, not delivered; confirmable write |
+| `medal.webhooks` | `src/resources/webhooks.ts` | `list()`, `create(input, opts?)` (secret returned ONCE), `get(id)`, `update(id, input, opts?)`, `delete(id, opts?)`, `deliveries(id, opts?)`, `test(id)`; `event_types` is `SubscribableWebhookEventType[]` — verify deliveries with `verifyWebhookSignature` |
+| `medal.channels.connectLinks` | `src/resources/channels.ts` (`ChannelConnectLinks`) | `create(input, opts?)`, `list(opts?)`, `revoke(id, opts?)` — partner connect links for personal-account channels |
+| `medal.channels.connections` | `src/resources/channels.ts` (`ChannelConnections`) | `list(opts?)`, `disconnect(id, opts?)` |
+| `medal.capabilityConfirmations` | `src/resources/capability-confirmations.ts` | `create(input)` — mints the `X-Capability-Confirmation` token a confirmable write needs; the client's `autoConfirmCapabilities` option does this for you |
 | `medal.workspaces` | `src/resources/workspaces.ts` | `list()` |
 
-**Note on naming:** `contacts.remove(id)` is `remove`, not `delete` — `delete` is a reserved word and was avoided. Same for `deals.remove(id)`, `posts.remove(id)`.
+**Note on naming:** `contacts.remove(id)` is `remove`, not `delete` — `delete` is a reserved word and was avoided. Same for `deals.remove(id)`, `posts.remove(id)`. (`webhooks.delete(id)` is the one exception, kept for compatibility.)
+
+**Enums are closed.** `DealStatus` (`draft | negotiating | offer_sent | signed | completed | declined`), `ContactStatus` (`lead | subscriber | customer | churned`), `PostStatus`, `EmailSendStatus`, `HelpdeskChannel` and `PortalLocale` (`no | en`) name exactly what the API accepts — every other value is a `400`. Do not cast around them.
 
 ## Contacts
 
@@ -64,6 +72,9 @@ const medal = new Medal("medal_xxx");
 
 // List with filters (paginated)
 const { data: contacts, pagination } = await medal.contacts.list({ status: "lead" });
+
+// "The contact for this e-mail" — `email` is an exact match; `search` is fuzzy
+const { data: [match] } = await medal.contacts.list({ email: "alice@example.com" });
 
 // Create
 const { data: contact } = await medal.contacts.create({
@@ -240,7 +251,7 @@ For more than 100 recipients, chunk into multiple `batch()` calls. There is no b
 ```ts
 // Step 1 — send the code. ALWAYS { status: 'sent' }, whether or not the address is a
 // contact: enumeration-safe, so do not treat "sent" as "this customer exists".
-await medal.portal.login.start({ email, locale: 'nb' });
+await medal.portal.login.start({ email, locale: 'no' });   // locale is 'no' | 'en' — 'nb' is a 400
 
 // Step 2 — exchange the code. Wrong, burned and expired codes ALL answer
 // 401 PORTAL_CODE_INVALID; there is no way to tell them apart, by design.

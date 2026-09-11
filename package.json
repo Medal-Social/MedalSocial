@@ -39,7 +39,7 @@
   },
   "sideEffects": false,
   "engines": {
-    "node": ">=24"
+    "node": ">=22"
   },
   "scripts": {
     "preinstall": "npx only-allow pnpm",
@@ -61,8 +61,9 @@
     "openapi:bundle": "node -e \"require('node:fs').mkdirSync('dist/openapi',{recursive:true})\" && redocly bundle openapi/medal-social.openapi.yaml --output dist/openapi/medal-social.openapi.json",
     "openapi:coverage": "node scripts/assert-openapi-sdk-coverage.mjs",
     "openapi:check": "pnpm openapi:lint && pnpm openapi:types && pnpm openapi:bundle && pnpm openapi:coverage",
-    "prepublishOnly": "pnpm test && pnpm openapi:lint && pnpm build && pnpm openapi:coverage && pnpm verify:paths",
-    "version": "changeset version && node -e \"const fs=require('fs');const p=JSON.parse(fs.readFileSync('./package.json','utf8'));const j=JSON.parse(fs.readFileSync('./jsr.json','utf8'));j.version=p.version;fs.writeFileSync('./jsr.json',JSON.stringify(j,null,2)+'\\n')\"",
+    "prepublishOnly": "pnpm run version:check && pnpm test && pnpm openapi:lint && pnpm build && pnpm openapi:coverage && pnpm verify:paths",
+    "version": "changeset version && node scripts/sync-version.mjs",
+    "version:check": "node scripts/sync-version.mjs --check",
     "release": "pnpm build && pnpm verify:paths && changeset publish",
     "jsr:publish": "node scripts/jsr-publish.mjs",
     "changeset": "changeset",

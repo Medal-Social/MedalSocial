@@ -35,6 +35,7 @@ import { Scan } from "./resources/scan";
 import { Webhooks } from "./resources/webhooks";
 import { Workspaces } from "./resources/workspaces";
 import type { AutoConfirmOptions } from "./types/capabilities";
+import { SDK_VERSION } from "./version";
 
 /** Options for configuring the {@link Medal} client. */
 export interface MedalOptions {
@@ -167,7 +168,7 @@ export class Medal {
       token,
       workspaceId: options?.workspaceId,
       timeout: options?.timeout ?? 30000,
-      userAgent: "medalsocial-sdk/1.0.0 (+https://github.com/Medal-Social/MedalSocial)",
+      userAgent: `medalsocial-sdk/${SDK_VERSION} (+https://github.com/Medal-Social/MedalSocial-SDK)`,
     });
 
     this.capabilityConfirmations = new CapabilityConfirmations(client);
@@ -291,13 +292,19 @@ export type {
   CreateConnectLinkInput,
   ListConnectLinksOptions,
 } from "./types/channels";
-export type { ApiResponse, PaginatedResponse, PaginationOptions } from "./types/common";
+export type {
+  ApiResponse,
+  PaginatedResponse,
+  PaginationOptions,
+  TimestampInput,
+} from "./types/common";
 // Re-export all types
 export { MedalApiError } from "./types/common";
 export type {
   Activity,
   AddNoteInput,
   Contact,
+  ContactAddress,
   ContactCreateResult,
   ContactNoteResult,
   ContactRemoveResult,
@@ -326,6 +333,7 @@ export type {
   BatchSendSummary,
   EmailSend,
   EmailSendResult,
+  EmailSendStatus,
   EmailTemplate,
   EmailTemplateDetail,
   GetTemplateOptions,
@@ -345,11 +353,14 @@ export type {
   RecordConsentInput,
 } from "./types/gdpr";
 export type {
+  ContactLinkSource,
   Conversation,
   ConversationMessage,
   ConversationStatus,
   ConversationUpdateResult,
   CreateReplyInput,
+  HelpdeskChannel,
+  HelpdeskChatType,
   HelpdeskMessageType,
   ListConversationsOptions,
   MessageAuthorType,
@@ -367,6 +378,7 @@ export type {
   PortalExportRelation,
   PortalFamilyMember,
   PortalLabels,
+  PortalLocale,
   PortalLoginStartInput,
   PortalLoginStartResult,
   PortalPerson,
@@ -381,8 +393,10 @@ export type {
   ListPostsOptions,
   Post,
   PostDetail,
+  PostStatus,
   PostType,
   PostVariant,
+  PostVariantStatus,
   PublishResult,
   SchedulePostInput,
   ScheduleResult,
@@ -413,16 +427,22 @@ export type {
   ChannelDisconnectedEvent,
   ChannelDisconnectReason,
   ConversationAssignedEvent,
+  ConversationContactLinkedEvent,
+  ConversationContactUnlinkedEvent,
   ConversationCreatedEvent,
   ConversationStatusChangedEvent,
+  MessageDeletedEvent,
   MessageDeliveryUpdatedEvent,
   MessageReceivedEvent,
   MessageSentEvent,
+  SubscribableWebhookEventType,
   TestPingEvent,
   VerifyWebhookSignatureInput,
   WebhookChannelLifecycleData,
+  WebhookContactLinkData,
   WebhookConversationSnapshot,
   WebhookEvent,
+  WebhookEventType,
   WebhookMessageSnapshot,
   WebhookVerificationErrorCode,
 } from "./webhook-events";

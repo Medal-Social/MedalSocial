@@ -2,7 +2,7 @@ openapi: 3.1.0
 jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
 info:
   title: Medal Social API
-  version: 1.1.7
+  version: 1.10.0
   description: Public API contract for the Medal Social TypeScript SDK.
   license:
     name: Apache-2.0
@@ -64,11 +64,41 @@ paths:
         - name: status
           in: query
           schema:
-            type: string
+            $ref: "#/components/schemas/PostStatus"
         - name: type
           in: query
           schema:
             $ref: "#/components/schemas/PostType"
+        - name: scheduled_from
+          in: query
+          description: Inclusive lower bound on `scheduled_at`.
+          schema:
+            $ref: "#/components/schemas/TimestampInput"
+        - name: scheduled_to
+          in: query
+          description: Inclusive upper bound on `scheduled_at`.
+          schema:
+            $ref: "#/components/schemas/TimestampInput"
+        - name: published_from
+          in: query
+          description: Inclusive lower bound on `published_at`.
+          schema:
+            $ref: "#/components/schemas/TimestampInput"
+        - name: published_to
+          in: query
+          description: Inclusive upper bound on `published_at`.
+          schema:
+            $ref: "#/components/schemas/TimestampInput"
+        - name: platforms
+          in: query
+          description: Comma-separated target platforms (e.g. `linkedin,x`).
+          schema:
+            type: string
+        - name: query
+          in: query
+          description: Free-text search across title and content.
+          schema:
+            type: string
       responses:
         "200":
           description: Posts page.
@@ -317,6 +347,13 @@ paths:
           in: query
           schema:
             type: string
+          description: Free-text search across name, email and company.
+        - name: email
+          in: query
+          schema:
+            type: string
+            format: email
+          description: Exact-match on the contact's email address.
       responses:
         "200":
           description: Contacts page.
@@ -477,6 +514,36 @@ paths:
           in: query
           schema:
             type: string
+        - name: close_date_from
+          in: query
+          description: Inclusive lower bound on the deal's close (`end_date`).
+          schema:
+            $ref: "#/components/schemas/TimestampInput"
+        - name: close_date_to
+          in: query
+          description: Inclusive upper bound on the deal's close (`end_date`).
+          schema:
+            $ref: "#/components/schemas/TimestampInput"
+        - name: min_value
+          in: query
+          description: Only deals worth at least this much.
+          schema:
+            type: number
+        - name: company_name
+          in: query
+          description: Case-insensitive contains match against the brand / company name.
+          schema:
+            type: string
+        - name: contact_id
+          in: query
+          description: Only deals linked to this contact.
+          schema:
+            type: string
+        - name: stage
+          in: query
+          description: Case-insensitive stage label match (e.g. `offer sent`).
+          schema:
+            type: string
       responses:
         "200":
           description: Deals page.
@@ -579,6 +646,14 @@ paths:
           in: query
           schema:
             type: string
+        - name: created_via
+          in: query
+          description: >-
+            Only bookings with this provenance. Every value the column holds is
+            filterable here, unlike the create body's allowlist; any other
+            value is a 400.
+          schema:
+            $ref: "#/components/schemas/BookingCreatedVia"
       responses:
         "200":
           description: Bookings page.
@@ -1547,6 +1622,20 @@ paths:
           schema:
             type: string
           description: Comma-separated channel types (e.g. `widget,whatsapp`).
+        - name: chat_type
+          in: query
+          schema:
+            $ref: "#/components/schemas/HelpdeskChatType"
+          description: >-
+            Only conversations of this chat kind on personal-account channels;
+            conversations without a chat type never match.
+        - name: assigned
+          in: query
+          schema:
+            type: boolean
+          description: >-
+            `false` = only conversations nobody owns yet, `true` = only owned
+            ones. Only the exact strings `true` / `false` are accepted.
       responses:
         "200":
           description: Conversations page.
@@ -2125,7 +2214,7 @@ components:
         content:
           type: string
         status:
-          type: string
+          $ref: "#/components/schemas/PostStatus"
         channel_ids:
           type: array
           items:
@@ -2151,6 +2240,24 @@ components:
     PostType:
       type: string
       enum: [social, newsletter, blog]
+    PostStatus:
+      description: >-
+        Lifecycle status of a post. `partial` = some variants published and
+        some failed; `unpublished` = every published variant was taken down.
+      type: string
+      enum:
+        - draft
+        - review
+        - approved
+        - scheduled
+        - publishing
+        - published
+        - failed
+        - partial
+        - unpublished
+    PostVariantStatus:
+      type: string
+      enum: [pending, scheduled, publishing, published, failed, unpublishing, unpublished]
     PostVariant:
       type: object
       required:
@@ -2173,7 +2280,7 @@ components:
         content:
           type: string
         status:
-          type: string
+          $ref: "#/components/schemas/PostVariantStatus"
         platform:
           type: [string, "null"]
         channel_display_name:
@@ -2307,6 +2414,24 @@ components:
           type: [string, "null"]
         status:
           type: string
+    EmailSendStatus:
+      description: >-
+        Delivery lifecycle of a sent email. `queued` is what a fresh send
+        reports; `opened` / `clicked` come from the tracker; `bounced`,
+        `complained`, `failed` and `cancelled` are terminal.
+      type: string
+      enum:
+        - pending
+        - queued
+        - sending
+        - sent
+        - delivered
+        - opened
+        - clicked
+        - bounced
+        - complained
+        - failed
+        - cancelled
     EmailSend:
       type: object
       required:
@@ -2327,7 +2452,7 @@ components:
         id:
           type: string
         status:
-          type: string
+          $ref: "#/components/schemas/EmailSendStatus"
         recipient_email:
           type: string
           format: email
@@ -2558,9 +2683,7 @@ components:
           type: [string, "null"]
         address:
           anyOf:
-            - type: object
-              additionalProperties:
-                type: string
+            - $ref: "#/components/schemas/ContactAddress"
             - type: "null"
         status:
           $ref: "#/components/schemas/ContactStatus"
@@ -2611,10 +2734,28 @@ components:
           type: string
     ContactStatus:
       type: string
-      enum: [lead, prospect, customer, churned, archived]
+      enum: [lead, subscriber, customer, churned]
     EmailStatus:
       type: string
       enum: [subscribed, unsubscribed, bounced, complained]
+    ContactAddress:
+      description: >-
+        A contact's postal address. Keys are camelCase (`postalCode`) — the
+        one object in /api/v1 that is not snake_case — and closed: any other
+        key is a 400 VALIDATION_ERROR.
+      type: object
+      additionalProperties: false
+      properties:
+        street:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        postalCode:
+          type: string
+        country:
+          type: string
     CreateContactInput:
       type: object
       required: [email]
@@ -2633,9 +2774,7 @@ components:
         job_title:
           type: string
         address:
-          type: object
-          additionalProperties:
-            type: string
+          $ref: "#/components/schemas/ContactAddress"
         status:
           $ref: "#/components/schemas/ContactStatus"
         email_status:
@@ -2729,7 +2868,7 @@ components:
           items:
             type: string
         status:
-          type: string
+          $ref: "#/components/schemas/ContactStatus"
     ImportContactsResult:
       type: object
       required: [added, skipped, total]
@@ -2819,11 +2958,11 @@ components:
           type: [string, "null"]
           format: email
         start_date:
-          type: [string, "null"]
-          format: date
+          type: [integer, "null"]
+          description: Unix timestamp in milliseconds. Sent as a date string, returned as ms.
         end_date:
-          type: [string, "null"]
-          format: date
+          type: [integer, "null"]
+          description: Unix timestamp in milliseconds. Sent as a date string, returned as ms.
         notes:
           type: [string, "null"]
         created_at:
@@ -2854,7 +2993,7 @@ components:
           const: true
     DealStatus:
       type: string
-      enum: [draft, open, won, lost, negotiating, proposal_sent, on_hold, churned]
+      enum: [draft, negotiating, offer_sent, signed, completed, declined]
     CreateDealInput:
       type: object
       required: [title]
@@ -2920,6 +3059,11 @@ components:
           format: date
         notes:
           type: string
+    TimestampInput:
+      description: >-
+        A timestamp on the way in to a list filter — Unix milliseconds, or an
+        ISO 8601 date-time string. Anything else is a 400 VALIDATION_ERROR.
+      type: [integer, string]
     BookingTimestampInput:
       description: >-
         A timestamp on the way in — Unix milliseconds, or an ISO 8601
@@ -3766,6 +3910,36 @@ components:
     HelpdeskConversationStatus:
       type: string
       enum: [open, snoozed, closed]
+    HelpdeskChannel:
+      description: >-
+        Channel a conversation lives on. The same set is accepted by the
+        `channels` filters on conversation listing and webhook endpoints.
+      type: string
+      enum:
+        - widget
+        - instagram
+        - messenger
+        - whatsapp
+        - twitter
+        - email
+        - linkedin_dm
+        - digipost
+        - finn
+        - trustpilot
+        - telegram
+    HelpdeskChatType:
+      description: >-
+        Kind of chat on a personal-account channel (Telegram today): a direct
+        message, a group, or a broadcast channel.
+      type: string
+      enum: [private, group, channel]
+    HelpdeskContactLinkSource:
+      description: >-
+        How a conversation's CRM contact was attached: `identity` (the widget
+        visitor's e-mail), `operator` (a member linked it in the inbox) or
+        `partner` (posted through the REST API).
+      type: string
+      enum: [identity, operator, partner]
     HelpdeskMessageAuthorType:
       type: string
       enum: [visitor, operator, ai, system]
@@ -3784,10 +3958,14 @@ components:
         - subject
         - assignee_user_id
         - contact_id
+        - contact_link_source
+        - contact_linked_at
         - visitor_name
         - visitor_email
         - external_conversation_id
         - channel_account_id
+        - chat_type
+        - chat_title
         - message_count
         - unread_for_operator
         - last_message_at
@@ -3799,10 +3977,7 @@ components:
         id:
           type: string
         channel:
-          type: string
-          description: >-
-            Channel type, e.g. `widget`, `instagram`, `messenger`, `whatsapp`,
-            `email`.
+          $ref: "#/components/schemas/HelpdeskChannel"
         channel_connection_id:
           type: [string, "null"]
         status:
@@ -3813,6 +3988,14 @@ components:
           type: [string, "null"]
         contact_id:
           type: [string, "null"]
+        contact_link_source:
+          anyOf:
+            - $ref: "#/components/schemas/HelpdeskContactLinkSource"
+            - type: "null"
+          description: How `contact_id` was attached, or `null` when the thread carries no contact.
+        contact_linked_at:
+          type: [integer, "null"]
+          description: Unix timestamp in milliseconds when the contact was attached, or `null`.
         visitor_name:
           type: [string, "null"]
         visitor_email:
@@ -3821,6 +4004,14 @@ components:
           type: [string, "null"]
         channel_account_id:
           type: [string, "null"]
+        chat_type:
+          anyOf:
+            - $ref: "#/components/schemas/HelpdeskChatType"
+            - type: "null"
+          description: DM / group / channel on personal-account channels; `null` elsewhere.
+        chat_title:
+          type: [string, "null"]
+          description: The external group or channel title; `null` for DMs and business channels.
         message_count:
           type: integer
         unread_for_operator:
@@ -3852,6 +4043,7 @@ components:
         - body
         - delivery_status
         - delivery_error
+        - externally_deleted_at
         - created_at
       properties:
         id:
@@ -3882,6 +4074,15 @@ components:
           type: [string, "null"]
           description: >-
             Last send error for a `failed` outbound message, otherwise `null`.
+        externally_deleted_at:
+          type: [integer, "null"]
+          description: >-
+            Unix timestamp in milliseconds when the customer deleted the
+            message on the external channel (Telegram today), otherwise
+            `null`. The message is kept as a tombstone so the thread still
+            reads in order, but its `body` is empty and any attachment has
+            been erased — mirror the deletion in your own store. Also
+            delivered as the `helpdesk.message_deleted` webhook event.
         created_at:
           type: integer
           description: Unix timestamp in milliseconds.
@@ -3938,6 +4139,24 @@ components:
         status:
           type: string
           const: created
+    WebhookSubscribableEventType:
+      description: >-
+        The event types an endpoint can subscribe to — every delivery type
+        except `test.ping`, which is only ever queued by the test route. Any
+        other string in `event_types` is a 400.
+      type: string
+      enum:
+        - helpdesk.conversation_created
+        - helpdesk.conversation_assigned
+        - helpdesk.conversation_status_changed
+        - helpdesk.message_received
+        - helpdesk.message_sent
+        - helpdesk.message_delivery_updated
+        - helpdesk.message_deleted
+        - helpdesk.conversation_contact_linked
+        - helpdesk.conversation_contact_unlinked
+        - helpdesk.channel_connected
+        - helpdesk.channel_disconnected
     WebhookEndpoint:
       type: object
       required:
@@ -3970,12 +4189,12 @@ components:
         event_types:
           type: array
           items:
-            type: string
+            $ref: "#/components/schemas/WebhookSubscribableEventType"
           description: Subscribed event types. Empty array = all events.
         channels:
           type: [array, "null"]
           items:
-            type: string
+            $ref: "#/components/schemas/HelpdeskChannel"
           description: >-
             Channel-type filter (e.g. `['widget', 'whatsapp']`), or `null` for
             all channels.
@@ -4027,15 +4246,15 @@ components:
         event_types:
           type: array
           items:
-            type: string
+            $ref: "#/components/schemas/WebhookSubscribableEventType"
           description: >-
             Event types to subscribe to (e.g. `helpdesk.message_received`).
-            Empty = all.
+            Empty = all; an unknown type is a 400.
         channels:
           type: array
           items:
-            type: string
-          description: Restrict to these channel types (e.g. `['widget', 'whatsapp']`).
+            $ref: "#/components/schemas/HelpdeskChannel"
+          description: Restrict to these channel types (e.g. `['widget', 'whatsapp']`); an unknown channel is a 400.
         channel_connection_ids:
           type: array
           items:
@@ -4054,11 +4273,11 @@ components:
         event_types:
           type: array
           items:
-            type: string
+            $ref: "#/components/schemas/WebhookSubscribableEventType"
         channels:
           type: [array, "null"]
           items:
-            type: string
+            $ref: "#/components/schemas/HelpdeskChannel"
           description: New channel-type filter, or `null` to clear the filter.
         channel_connection_ids:
           type: [array, "null"]
@@ -4690,6 +4909,12 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/ManageSummary"
+    PortalLocale:
+      description: >-
+        Locale of the one-time-code e-mail. Exactly these two are accepted —
+        `nb`, `nn` and every other spelling of Norwegian are a 400.
+      type: string
+      enum: ["no", en]
     PortalLoginStartInput:
       type: object
       required: [email]
@@ -4699,8 +4924,7 @@ components:
           format: email
           description: The address the code is sent to.
         locale:
-          type: string
-          description: Locale for the e-mail (e.g. `nb`, `en`); the workspace default when omitted.
+          $ref: "#/components/schemas/PortalLocale"
     PortalLoginStartResult:
       description: >-
         Always `sent`, whether or not the address is a known contact — the
