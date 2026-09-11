@@ -83,6 +83,8 @@
   "files": [
     "dist",
     "openapi",
+    "!openapi/reference",
+    "!openapi/parity-exceptions.json",
     "skills",
     "!skills/_artifacts",
     "!skills/**/_artifacts",

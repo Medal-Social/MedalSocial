@@ -112,7 +112,10 @@ export function parseRetryAfterMs(value: string | null, now: number = Date.now()
   if (value === null) return null;
   const trimmed = value.trim();
   if (trimmed === "") return null;
-  if (/^\d+$/.test(trimmed)) return Number(trimmed) * 1000;
+  // RFC 9110's delay-seconds is a non-negative integer, but accept a decimal
+  // too: a proxy that answers `1.5` means a second and a half, and reading that
+  // as "no header" would replace a server-specified wait with our own guess.
+  if (/^\d+(?:\.\d+)?$/.test(trimmed)) return Number(trimmed) * 1000;
   const at = Date.parse(trimmed);
   if (Number.isNaN(at)) return null;
   return Math.max(0, at - now);
@@ -175,6 +178,14 @@ export async function* paginate<T>(
     cursor = next;
   }
 }
+
+/**
+ * Plain sleep. Exported for the poll helpers (`scan.waitForResult`,
+ * `bookings.payment.waitForSettlement`) so there is ONE of these in the SDK
+ * rather than a copy per resource; not re-exported from the package entry.
+ */
+export const sleep = (ms: number): Promise<void> =>
+  new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 /** Sleep, but wake early (and reject) if the caller's signal aborts. */
 function delay(ms: number, signal?: AbortSignal): Promise<void> {
@@ -413,9 +424,10 @@ export class BaseClient {
       controller.signal.addEventListener("abort", onTimeout, { once: true });
       // The caller's cancellation is forwarded into the SAME controller the
       // deadline uses, rather than merged with `AbortSignal.any` (not present
-      // in every runtime this SDK supports). `timedOut` stays false on this
-      // path, which is what keeps a cancellation from being reported as a
-      // timeout.
+      // in every runtime this SDK supports). That sets `timedOut` as well — it
+      // is one abort event either way — so the catch below checks the caller's
+      // signal FIRST, and that ordering is what keeps a cancellation from being
+      // reported as a timeout.
       const onCallerAbort = () => controller.abort(abortReason(callerSignal as AbortSignal));
       callerSignal?.addEventListener("abort", onCallerAbort, { once: true });
 

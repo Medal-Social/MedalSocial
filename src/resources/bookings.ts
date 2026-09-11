@@ -1,4 +1,5 @@
 import type { BaseClient, RequestOptions } from "../client";
+import { sleep } from "../client";
 import type {
   Booking,
   BookingActionResult,
@@ -43,8 +44,6 @@ import type {
   WaitForSettlementOptions,
 } from "../types/bookings";
 import type { ApiResponse } from "../types/common";
-
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 /** Default poll gap on the booking-id route, which shares the `apiRead` bucket. */
 const SETTLEMENT_POLL_MS = 2500;

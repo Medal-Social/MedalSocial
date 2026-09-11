@@ -107,9 +107,7 @@ describe("MedalErrorCode (SDK-26)", () => {
     expect(err.code).toBe(known);
     // And a code the server might add tomorrow still type-checks and arrives
     // intact — the union is widened with `string` on purpose.
-    expect(new MedalApiError(400, "A_CODE_FROM_NEXT_WEEK", "x").code).toBe(
-      "A_CODE_FROM_NEXT_WEEK",
-    );
+    expect(new MedalApiError(400, "A_CODE_FROM_NEXT_WEEK", "x").code).toBe("A_CODE_FROM_NEXT_WEEK");
   });
 });
 
@@ -298,6 +296,10 @@ describe("retry helpers (SDK-15)", () => {
   it("parses numeric Retry-After seconds", () => {
     expect(parseRetryAfterMs("2")).toBe(2000);
     expect(parseRetryAfterMs("0")).toBe(0);
+    // A proxy that answers a decimal means a second and a half, not "no header"
+    // — and `Date.parse("1.5")` happens to be a date in 2001, so falling through
+    // to the date branch would silently discard the server's wait.
+    expect(parseRetryAfterMs("1.5")).toBe(1500);
   });
 
   it("parses an HTTP-date Retry-After relative to now", () => {

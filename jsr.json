@@ -9,6 +9,8 @@
       ".husky",
       ".vscode",
       ".changeset",
+      "openapi/reference",
+      "openapi/parity-exceptions.json",
       ".claude",
       "tests",
       "**/*.test.ts",
