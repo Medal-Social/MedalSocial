@@ -159,6 +159,14 @@ version the registry already has downgrades to a warning naming the likely
 culprit. Anything else still fails the job. `pnpm jsr:publish --dry-run`
 reports what it would do without publishing.
 
+That dry run does **not** validate the package — it never runs `jsr publish`,
+so a slow type (a public-API symbol with no explicit type) or a publish-scope
+error passes it and fails only mid-release, after npm already has the version.
+CI's `build` job therefore runs the real CLI,
+`pnpm exec jsr publish --dry-run --allow-dirty`; run the same locally before
+promoting. 1.11.0 was caught this way: `MedalTimeoutError`'s constructor had an
+untyped default parameter.
+
 A version published without provenance has `rekorLogId: null` in
 `https://api.jsr.io/scopes/medalsocial/packages/sdk/versions` — that is how to
 tell an attestation failure from a healthy release after the fact.
@@ -171,7 +179,7 @@ tell an attestation failure from a healthy release after the fact.
 |-----|---------------|
 | `test` | Vitest via `pnpm test:coverage` + Codecov upload. Coverage thresholds are **100%** on statements/branches/functions/lines — a new uncovered branch fails CI |
 | `lint` | Biome |
-| `build` | `pnpm typecheck`, then OpenAPI lint, `tsup` build, OpenAPI coverage, entry-point verification |
+| `build` | `pnpm typecheck`, then OpenAPI lint, `tsup` build, OpenAPI coverage, entry-point verification, then a JSR dry run (`jsr publish --dry-run`: slow types and the publish scope) |
 | `security` | secretlint over tracked files + knip |
 
 `pnpm typecheck` runs `tsc --noEmit` twice: once on `tsconfig.json` (`src` only,
