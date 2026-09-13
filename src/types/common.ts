@@ -167,7 +167,7 @@ export class MedalTimeoutError extends MedalError {
   /** The budget that elapsed, in milliseconds. */
   readonly timeoutMs: number;
 
-  constructor(timeoutMs: number, message = `Request timed out after ${timeoutMs}ms`) {
+  constructor(timeoutMs: number, message: string = `Request timed out after ${timeoutMs}ms`) {
     super("TIMEOUT", message);
     this.name = "MedalTimeoutError";
     this.timeoutMs = timeoutMs;

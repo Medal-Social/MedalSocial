@@ -95,6 +95,18 @@ jobs:
 
       - run: pnpm verify:paths
 
+      # JSR validates the package on rules npm, tsc, tsup and verify:paths never
+      # see: it rejects "slow types" (a public-API symbol with no explicit type)
+      # and enforces jsr.json's publish scope. release.yml publishes JSR in its
+      # own step AFTER npm, so a JSR-only error used to surface mid-release and
+      # leave npm and JSR on different versions. 1.11.0 would have done exactly
+      # that: MedalTimeoutError's constructor had an untyped default parameter.
+      # This runs the real CLI in dry-run mode so the PR fails instead. It must
+      # be `jsr publish --dry-run` itself - `pnpm jsr:publish --dry-run` only
+      # reports what it would do and never runs the checks.
+      - name: JSR package check (slow types, publish scope)
+        run: pnpm exec jsr publish --dry-run --allow-dirty
+
   # Typecheck (tsgo shadow) — ADVISORY ONLY, never a required context and never
   # gating. TypeScript 7 is the native port; `tsc --noEmit` already passes on
   # this repo under it, so this job exists to tell us when that stops being
